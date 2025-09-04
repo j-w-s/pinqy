@@ -1,4 +1,4 @@
-# PINQY - LINQ-like Operations for Python
+# pinqy - linq-like operations for python
 
 ```
     __________.___ _______   ________ _____.___.
@@ -22,7 +22,7 @@ then include the `pinqy.py` file in your project.
 ## quick start
 
 ```python
-from pinqy import pinqy, P, from_range, repeat, empty, generate
+from pinqy import pinqy, p, from_range, repeat, empty, generate
 
 # basic usage
 numbers = pinqy([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -34,7 +34,7 @@ result = (numbers
 # result: [4, 16, 36]
 
 # aliases available
-P([1,2,3]).where(lambda x: x > 1).to_list()  # [2, 3]
+p([1,2,3]).where(lambda x: x > 1).to_list()  # [2, 3]
 ```
 
 ## core concepts
@@ -63,8 +63,8 @@ filtered = large_numbers.where(lambda x: x > 500).to_list()
 
 ### factory functions
 
-#### `from_iterable(data: Iterable[T]) -> Enumerable[T]`
-creates enumerable from any iterable. alias: `pinqy()`, `P()`
+#### `from_iterable(data: iterable[t]) -> enumerable[t]`
+creates enumerable from any iterable. aliases: `pinqy()`, `p()`
 
 ```python
 pinqy([1, 2, 3])
@@ -72,28 +72,28 @@ pinqy(range(10))
 pinqy("hello")  # works with strings too
 ```
 
-#### `from_range(start: int, count: int) -> Enumerable[int]`
+#### `from_range(start: int, count: int) -> enumerable[int]`
 creates enumerable from range of integers
 
 ```python
 from_range(10, 5).to_list()  # [10, 11, 12, 13, 14]
 ```
 
-#### `repeat(item: T, count: int) -> Enumerable[T]`
+#### `repeat(item: t, count: int) -> enumerable[t]`
 repeats an item multiple times
 
 ```python
 repeat("hello", 3).to_list()  # ["hello", "hello", "hello"]
 ```
 
-#### `empty() -> Enumerable[T]`
+#### `empty() -> enumerable[t]`
 creates empty enumerable
 
 ```python
 empty().count()  # 0
 ```
 
-#### `generate(generator_func: Callable[[], T], count: int) -> Enumerable[T]`
+#### `generate(generator_func: callable[[], t], count: int) -> enumerable[t]`
 generates sequence using a function
 
 ```python
@@ -103,7 +103,7 @@ generate(lambda: random.randint(1, 10), 5).to_list()  # [3, 7, 2, 9, 1]
 
 ### filtering and projection
 
-#### `.where(predicate: Predicate[T]) -> Enumerable[T]`
+#### `.where(predicate: predicate[t]) -> enumerable[t]`
 filters elements based on condition
 - **performance**: numpy optimized for numeric predicates
 - **usage**: chain multiple where calls for complex filtering
@@ -112,7 +112,7 @@ filters elements based on condition
 numbers.where(lambda x: x > 5).where(lambda x: x % 2 == 0)
 ```
 
-#### `.select(selector: Selector[T, U]) -> Enumerable[U]`
+#### `.select(selector: selector[t, u]) -> enumerable[u]`
 projects each element to new form
 - **performance**: numpy optimized for numeric transformations
 - **usage**: can change element type
@@ -122,211 +122,288 @@ words.select(lambda w: len(w))  # project to lengths
 people.select(lambda p: p['name'])  # extract property
 ```
 
-#### `.select_many(selector: Selector[T, Iterable[U]]) -> Enumerable[U]`
+#### `.select_many(selector: selector[t, iterable[u]]) -> enumerable[u]`
 flattens nested sequences
 - **usage**: similar to flatmap
 
 ```python
-sentences.select_many(lambda s: s.split())  # flatten to words
+sentences = pinqy(['hello world', 'how are you'])
+sentences.select_many(lambda s: s.split()).to_list()
+# ['hello', 'world', 'how', 'are', 'you']
+```
+
+#### `.select_with_index(selector: callable[[t, int], u]) -> enumerable[u]`
+projects each element using its index.
+
+```python
+pinqy(['a', 'b', 'c']).select_with_index(lambda item, index: f"{index}:{item}").to_list()
+# ['0:a', '1:b', '2:c']
+```
+
+#### `.of_type(type_filter: type[u]) -> enumerable[u]`
+filters elements based on a specified type.
+
+```python
+mixed_list = pinqy([1, "hello", 2.5, "world", 3])
+mixed_list.of_type(str).to_list()  # ['hello', 'world']
 ```
 
 ### sorting operations
 
-#### `.order_by(key_selector: KeySelector[T, K]) -> OrderedEnumerable[T]`
-sorts elements by key in ascending order
+#### `.order_by(key_selector: keyselector[t, k]) -> orderedenumerable[t]`
+sorts elements by key in ascending order. returns an `orderedenumerable`.
 
 ```python
 people.order_by(lambda p: p['age'])
 ```
 
-#### `.order_by_descending(key_selector: KeySelector[T, K]) -> OrderedEnumerable[T]`
-sorts elements by key in descending order
+#### `.order_by_descending(key_selector: keyselector[t, k]) -> orderedenumerable[t]`
+sorts elements by key in descending order. returns an `orderedenumerable`.
 
 ```python
 people.order_by_descending(lambda p: p['salary'])
 ```
 
-#### `.then_by(key_selector: KeySelector[T, K]) -> OrderedEnumerable[T]`
-secondary sort (only on ordered enumerables)
+#### `.reverse() -> enumerable[t]`
+inverts the order of the elements in a sequence.
+
+```python
+pinqy([1, 2, 3]).reverse().to_list()  # [3, 2, 1]
+```
+
+#### `.as_ordered() -> orderedenumerable[t]`
+treats the current sequence as already ordered, allowing `then_by` to be called without performing an initial sort.
+
+```python
+# use only when you know the source data is pre-sorted
+pre_sorted_data.as_ordered().then_by(lambda x: x.secondary_key)
+```
+
+### ordered enumerable operations
+these methods are only available on an `orderedenumerable` (i.e., after calling `order_by` or `order_by_descending`).
+
+#### `.then_by(key_selector: keyselector[t, k]) -> orderedenumerable[t]`
+secondary sort in ascending order.
 
 ```python
 people.order_by(lambda p: p['department']).then_by(lambda p: p['age'])
 ```
 
-#### `.then_by_descending(key_selector: KeySelector[T, K]) -> OrderedEnumerable[T]`
-secondary sort descending
+#### `.then_by_descending(key_selector: keyselector[t, k]) -> orderedenumerable[t]`
+secondary sort in descending order.
 
 ```python
 people.order_by(lambda p: p['city']).then_by_descending(lambda p: p['salary'])
 ```
 
+#### `.find_by_key(*key_prefix: any) -> enumerable[t]`
+efficiently finds items matching a key prefix using binary search (o(log n)).
+- **edge case**: raises `notimplementederror` if any searched keys are sorted descending.
+
+```python
+users.order_by(lambda u: u.state).then_by(lambda u: u.city).find_by_key("ca", "los angeles")
+```
+
+#### `.between_keys(lower_bound: union[any, tuple], upper_bound: union[any, tuple]) -> enumerable[t]`
+efficiently gets a slice of items where the sort key(s) are between the bounds.
+- **edge case**: raises `notimplementederror` if sorted descending.
+
+```python
+products.order_by(lambda p: p.price).between_keys(10.00, 49.99)
+```
+
+#### `.merge_with(other: orderedenumerable[t]) -> enumerable[t]`
+efficiently merges this sorted sequence with another compatible sorted sequence (o(n + m)).
+- **edge case**: raises `typeerror` if sort keys and directions are not identical.
+
+```python
+sorted1 = pinqy(data1).order_by(lambda x: x.id)
+sorted2 = pinqy(data2).order_by(lambda x: x.id)
+merged = sorted1.merge_with(sorted2)
+```
+
+#### `.lag_in_order(periods: int = 1, fill_value: optional[t] = none) -> enumerable[optional[t]]`
+shifts elements by periods based on the sorted order.
+
+#### `.lead_in_order(periods: int = 1, fill_value: optional[t] = none) -> enumerable[optional[t]]`
+shifts elements forward by periods based on the sorted order.
+
 ### pagination operations
 
-#### `.take(count: int) -> Enumerable[T]`
-takes first n elements
-- **edge case**: safe with counts larger than sequence
+#### `.take(count: int) -> enumerable[t]`
+takes first n elements.
+- **edge case**: safe with counts larger than sequence.
 
 ```python
 pinqy([1,2]).take(5).to_list()  # [1, 2]
 ```
 
-#### `.skip(count: int) -> Enumerable[T]`
-skips first n elements
+#### `.skip(count: int) -> enumerable[t]`
+skips first n elements.
 
 ```python
-numbers.skip(3).take(2).to_list()  # skip 3, take next 2
+numbers.skip(3).take(2).to_list()  # from [1..10], returns [4, 5]
 ```
 
-#### `.take_while(predicate: Predicate[T]) -> Enumerable[T]`
-takes elements while condition is true
+#### `.take_while(predicate: predicate[t]) -> enumerable[t]`
+takes elements while condition is true, then stops.
 
 ```python
-numbers.take_while(lambda x: x < 5)  # stops at first >= 5
+pinqy([1, 2, 6, 3, 7]).take_while(lambda x: x < 5).to_list()  # [1, 2]
 ```
 
-#### `.skip_while(predicate: Predicate[T]) -> Enumerable[T]`
-skips elements while condition is true
+#### `.skip_while(predicate: predicate[t]) -> enumerable[t]`
+skips elements while condition is true, then returns the rest.
 
 ```python
-numbers.skip_while(lambda x: x < 5)  # starts from first >= 5
+pinqy([1, 2, 6, 3, 7]).skip_while(lambda x: x < 5).to_list()  # [6, 3, 7]
 ```
 
 ### set operations
 
-#### `.distinct(key_selector: Optional[KeySelector[T, K]] = None) -> Enumerable[T]`
-returns unique elements
-- **performance**: numpy optimized for numeric data
-- **usage**: preserves order
+#### `.distinct(key_selector: optional[keyselector[t, k]] = none) -> enumerable[t]`
+returns unique elements, preserving order of first appearance.
+- **performance**: numpy optimized for numeric data.
 
 ```python
-numbers.distinct()  # unique numbers
-people.distinct(lambda p: p['city'])  # unique by city
+pinqy([1, 2, 1, 3, 2]).distinct().to_list()  # [1, 2, 3]
+people.distinct(lambda p: p['city'])  # unique people by first city seen
 ```
 
-#### `.union(other: Iterable[T]) -> Enumerable[T]`
-union of two sequences
-- **performance**: numpy optimized when possible
+#### `.union(other: iterable[t]) -> enumerable[t]`
+union of two sequences (distinct elements, order preserved).
+- **performance**: numpy optimized when possible.
 
 ```python
-list1.union(list2)  # combined unique elements
+p([1, 2]).union([2, 3, 4]).to_list()  # [1, 2, 3, 4]
 ```
 
-#### `.intersect(other: Iterable[T]) -> Enumerable[T]`
-intersection of sequences
+#### `.intersect(other: iterable[t]) -> enumerable[t]`
+intersection of sequences, preserving order from the first sequence.
 
 ```python
-list1.intersect(list2)  # common elements
+p([1, 2, 3]).intersect([2, 4, 3]).to_list()  # [2, 3]
 ```
 
-#### `.except_(other: Iterable[T]) -> Enumerable[T]`
-elements in first sequence but not second
+#### `.except_(other: iterable[t]) -> enumerable[t]`
+elements in first sequence but not second (set difference).
 
 ```python
-list1.except_(list2)  # elements only in list1
+p([1, 2, 3]).except_([2, 4]).to_list()  # [1, 3]
 ```
 
-#### `.concat(other: Iterable[T]) -> Enumerable[T]`
-concatenates sequences (allows duplicates)
+#### `.symmetric_difference(other: iterable[t]) -> enumerable[t]`
+elements that are in one sequence or the other, but not both.
 
 ```python
-list1.concat(list2)  # all elements from both
+p([1, 2, 3]).symmetric_difference([2, 4, 5]).to_list() # [1, 3, 4, 5]
 ```
+
+#### `.concat(other: iterable[t]) -> enumerable[t]`
+concatenates sequences, allowing duplicates.
+
+```python
+p([1, 2]).concat([2, 3]).to_list()  # [1, 2, 2, 3]
+```
+
+#### `.multiset_intersect(other: iterable[t]) -> enumerable[t]`
+intersection of two multisets (bags), respecting element counts.
+
+```python
+p([1, 1, 2, 3]).multiset_intersect([1, 2, 2]).to_list() # [1, 2]
+```
+
+#### `.except_by_count(other: iterable[t]) -> enumerable[t]`
+difference of two multisets (bags), respecting element counts.
+
+```python
+p([1, 1, 2, 3]).except_by_count([1, 2, 2]).to_list() # [1, 3]
+```
+
+#### `.is_subset_of(other: iterable[t]) -> bool`
+determines whether this sequence is a subset of another.
+
+#### `.is_superset_of(other: iterable[t]) -> bool`
+determines whether this sequence is a superset of another.
+
+#### `.is_proper_subset_of(other: iterable[t]) -> bool`
+determines whether this sequence is a proper subset of another.
+
+#### `.is_proper_superset_of(other: iterable[t]) -> bool`
+determines whether this sequence is a proper superset of another.
+
+#### `.is_disjoint_with(other: iterable[t]) -> bool`
+determines whether this sequence has no elements in common with another.
+
+#### `.jaccard_similarity(other: iterable[t]) -> float`
+calculates jaccard similarity (intersection over union), a value between 0.0 and 1.0.
 
 ### grouping operations
 
-#### `.group_by(key_selector: KeySelector[T, K]) -> Dict[K, List[T]]`
-groups elements by key
-- **returns**: dictionary not enumerable
-- **performance**: uses defaultdict internally
+#### `.group_by(key_selector: keyselector[t, k]) -> dict[k, list[t]]`
+groups elements by key.
+- **returns**: dictionary, not an enumerable.
+- **performance**: uses `defaultdict` internally for efficiency.
 
 ```python
 people.group_by(lambda p: p['department'])
 # {'engineering': [person1, person2], 'sales': [person3]}
 ```
 
-#### `.group_by_multiple(*key_selectors: KeySelector[T, Any]) -> Dict[Tuple, List[T]]`
-groups by multiple keys
+#### `.group_by_multiple(*key_selectors: keyselector[t, any]) -> dict[tuple, list[t]]`
+groups by multiple keys into a composite tuple key.
 
 ```python
-people.group_by_multiple(
-    lambda p: p['department'],
-    lambda p: p['seniority']
-)
-# {('engineering', 'senior'): [...], ('sales', 'junior'): [...]}
+people.group_by_multiple(lambda p: p['dept'], lambda p: p['level'])
+# {('eng', 'sr'): [...], ('sales', 'jr'): [...]}
 ```
 
-#### `.group_by_with_aggregate(key_selector, element_selector, result_selector) -> Dict[K, V]`
-groups and transforms each group
+#### `.group_by_with_aggregate(key_selector, element_selector, result_selector) -> dict[k, v]`
+groups and transforms each group into a final value.
 
 ```python
 people.group_by_with_aggregate(
-    lambda p: p['city'],          # group by city
-    lambda p: p['salary'],        # extract salary
-    lambda city, salaries: {      # aggregate
-        'city': city,
-        'avg_salary': sum(salaries) / len(salaries),
-        'count': len(salaries)
-    }
-)
+    lambda p: p['city'],
+    lambda p: p['salary'],
+    lambda city, salaries: sum(salaries) / len(salaries)
+) # returns {'new york': 95000, 'london': 88000}
 ```
 
 ### join operations
 
-#### `.join(inner, outer_key_selector, inner_key_selector, result_selector) -> Enumerable[V]`
-inner join two sequences
-- **performance**: builds lookup dictionary for inner sequence
+#### `.join(inner, outer_key_selector, inner_key_selector, result_selector) -> enumerable[v]`
+inner join two sequences.
+- **performance**: builds a lookup dictionary for the inner sequence for efficiency.
 
 ```python
-people.join(
-    orders,
-    lambda p: p['id'],           # person id
-    lambda o: o['customer_id'],  # order customer_id
-    lambda p, o: {               # result
-        'person': p['name'],
-        'order_amount': o['total']
-    }
-)
+people.join(orders, lambda p: p['id'], lambda o: o['customer_id'],
+            lambda p, o: {'name': p['name'], 'total': o['total']})
 ```
 
-#### `.left_join(inner, outer_key_selector, inner_key_selector, result_selector, default_inner=None) -> Enumerable[V]`
-left outer join - includes all outer elements
+#### `.left_join(inner, outer_key_selector, inner_key_selector, result_selector, default_inner=none) -> enumerable[v]`
+left outer join; includes all outer elements.
 
 ```python
-people.left_join(
-    orders,
-    lambda p: p['id'],
-    lambda o: o['customer_id'],
-    lambda p, o: {
-        'person': p['name'],
-        'order_total': o['total'] if o else 0
-    }
-)
+people.left_join(orders, lambda p: p['id'], lambda o: o['customer_id'],
+                 lambda p, o: {'name': p['name'], 'total': o['total'] if o else 0})
 ```
 
-#### `.right_join(inner, outer_key_selector, inner_key_selector, result_selector, default_outer=None) -> Enumerable[V]`
-right outer join - includes all inner elements
+#### `.right_join(inner, outer_key_selector, inner_key_selector, result_selector, default_outer=none) -> enumerable[v]`
+right outer join; includes all inner elements.
 
-#### `.full_outer_join(inner, outer_key_selector, inner_key_selector, result_selector, default_outer=None, default_inner=None) -> Enumerable[V]`
-full outer join - includes all elements from both sequences
+#### `.full_outer_join(inner, outer_key_selector, inner_key_selector, result_selector, default_outer=none, default_inner=none) -> enumerable[v]`
+full outer join; includes all elements from both sequences.
 
-#### `.group_join(inner, outer_key_selector, inner_key_selector, result_selector) -> Enumerable[V]`
-groups inner elements by outer key
+#### `.group_join(inner, outer_key_selector, inner_key_selector, result_selector) -> enumerable[v]`
+groups inner elements by outer key for each outer element.
 
 ```python
-people.group_join(
-    orders,
-    lambda p: p['id'],
-    lambda o: o['customer_id'],
-    lambda p, orders_list: {
-        'person': p['name'],
-        'order_count': len(orders_list),
-        'total_spent': sum(o['total'] for o in orders_list)
-    }
-)
+people.group_join(orders, lambda p: p['id'], lambda o: o['customer_id'],
+                  lambda p, orders: {'name': p['name'], 'order_count': len(orders)})
 ```
 
-#### `.cross_join(inner: Iterable[U]) -> Enumerable[Tuple[T, U]]`
-cartesian product of sequences
+#### `.cross_join(inner: iterable[u]) -> enumerable[tuple[t, u]]`
+cartesian product of two sequences.
 
 ```python
 colors.cross_join(sizes)  # all color-size combinations
@@ -334,477 +411,400 @@ colors.cross_join(sizes)  # all color-size combinations
 
 ### zip operations
 
-#### `.zip_with(other, result_selector) -> Enumerable[V]`
-zips with custom result selector
+#### `.zip_with(other, result_selector) -> enumerable[v]`
+zips two sequences with a custom result selector.
 
 ```python
-numbers.zip_with(letters, lambda n, l: f"{n}{l}")
+pinqy([1, 2]).zip_with(['a', 'b'], lambda n, l: f"{n}{l}").to_list()
+# ['1a', '2b']
 ```
 
-#### `.zip_longest_with(other, result_selector, default_self=None, default_other=None) -> Enumerable[V]`
-zips padding shorter sequence with defaults
+#### `.zip_longest_with(other, result_selector, default_self=none, default_other=none) -> enumerable[v]`
+zips sequences, padding the shorter one with default values.
 
 ```python
-numbers.zip_longest_with(
-    letters,
-    lambda n, l: f"{n or 0}{l or 'z'}",
-    default_self=0,
-    default_other='z'
-)
+p([1,2]).zip_longest_with(['a'], lambda n,l: f"{n}{l}", default_self=0, default_other='z').to_list()
+# ['1a', '2z']
 ```
 
-### functional operations
+### functional & structural operations
 
-#### `.partition(predicate: Predicate[T]) -> Tuple[List[T], List[T]]`
-splits into two lists based on predicate
+#### `.partition(predicate: predicate[t]) -> tuple[list[t], list[t]]`
+splits elements into two lists based on a predicate.
 
 ```python
 evens, odds = numbers.partition(lambda x: x % 2 == 0)
 ```
 
-#### `.chunk(size: int) -> Enumerable[List[T]]`
-splits into chunks of specified size
+#### `.chunk(size: int) -> enumerable[list[t]]`
+splits into chunks of a specified size.
 
 ```python
 numbers.chunk(3).to_list()  # [[1,2,3], [4,5,6], [7,8,9], [10]]
 ```
 
-#### `.window(size: int) -> Enumerable[List[T]]`
-creates sliding windows
-- **edge case**: returns empty if sequence shorter than window
+#### `.batched(size: int) -> enumerable[tuple[t, ...]]`
+batches elements into tuples of a specified size (python 3.12+).
+
+#### `.window(size: int) -> enumerable[list[t]]`
+creates sliding windows of elements.
+- **edge case**: returns empty if sequence is shorter than window size.
 
 ```python
 numbers.window(3).to_list()  # [[1,2,3], [2,3,4], [3,4,5], ...]
 ```
 
-#### `.scan(accumulator, seed) -> Enumerable[U]`
-produces intermediate accumulation values
+#### `.pairwise() -> enumerable[tuple[t, t]]`
+returns consecutive pairs of elements.
 
 ```python
-numbers.scan(lambda acc, x: acc + x, 0)  # cumulative sums
-# [0, 1, 3, 6, 10, 15, ...]
+pinqy([1, 2, 3, 4]).pairwise().to_list()  # [(1,2), (2,3), (3,4)]
 ```
 
-#### `.pairwise() -> Enumerable[Tuple[T, T]]`
-returns consecutive pairs
+#### `.scan(accumulator, seed) -> enumerable[u]`
+produces intermediate accumulation values (cumulative fold).
 
 ```python
-numbers.pairwise().to_list()  # [(1,2), (2,3), (3,4), ...]
+pinqy([1,2,3]).scan(lambda acc, x: acc + x, 0).to_list()  # [0, 1, 3, 6]
+```
+
+#### `.flatten(depth: int = 1) -> enumerable[any]`
+flattens nested sequences to a specified depth.
+
+```python
+nested = pinqy([1, [2, 3], [4, [5]]])
+nested.flatten(1).to_list() # [1, 2, 3, 4, [5]]
+nested.flatten(2).to_list() # [1, 2, 3, 4, 5]
+```
+
+#### `.transpose() -> enumerable[list[t]]`
+transposes a matrix-like structure (list of lists).
+
+```python
+matrix = pinqy([[1, 2, 3], [4, 5, 6]])
+matrix.transpose().to_list() # [[1, 4], [2, 5], [3, 6]]
+```
+
+#### `.unzip() -> tuple[enumerable[any], ...]`
+transforms an enumerable of tuples/lists into a tuple of enumerables.
+
+```python
+p([('a', 1), ('b', 2)]).unzip() # (pinqy(['a', 'b']), pinqy([1, 2]))
+```
+
+#### `.intersperse(separator: t) -> enumerable[t]`
+places a separator element between each element of a sequence.
+
+```python
+pinqy([1, 2, 3]).intersperse(0).to_list()  # [1, 0, 2, 0, 3]
+```
+
+#### `.batch_by(key_selector) -> enumerable[list[t]]`
+batches consecutive elements that share the same key.
+
+```python
+pinqy([1, 1, 2, 3, 3, 3, 2]).batch_by(lambda x: x).to_list()
+# [[1, 1], [2], [3, 3, 3], [2]]
+```
+
+#### `.for_each(action: callable[[t], any]) -> enumerable[t]`
+performs an action on each element for side-effects, returning the original enumerable.
+
+```python
+numbers.for_each(print).where(lambda x: x > 5).to_list() # prints 1-10, returns [6,7,8,9,10]
 ```
 
 ### mathematical operations
 
-#### `.sum(selector: Optional[Selector[T, Union[int, float]]] = None) -> Union[int, float]`
-calculates sum
-- **performance**: numpy optimized for numeric data
+#### `.sum(selector: optional[selector[...]] = none) -> union[int, float]`
+calculates the sum.
+- **performance**: uses numpy for numeric data.
 
 ```python
 numbers.sum()
 people.sum(lambda p: p['salary'])
 ```
 
-#### `.average(selector: Optional[Selector[T, Union[int, float]]] = None) -> float`
-calculates average
-- **edge case**: raises error on empty sequence
+#### `.average(selector: optional[selector[...]] = none) -> float`
+calculates the average.
+- **edge case**: raises `valueerror` on an empty sequence.
 
 ```python
 numbers.average()
 people.average(lambda p: p['age'])
 ```
 
-#### `.min(selector: Optional[Selector[T, Union[int, float]]] = None) -> Union[T, Union[int, float]]`
-finds minimum
+#### `.min(selector: optional[selector[...]] = none) -> t`
+finds the minimum value or element.
+- **usage**: with no selector, finds min value. with selector, returns the *entire element* having the min selected value.
 
 ```python
-numbers.min()
-people.min(lambda p: p['age'])  # returns person with min age
+numbers.min() # 1
+people.min(lambda p: p['age']) # returns the person object with the minimum age
 ```
 
-#### `.max(selector: Optional[Selector[T, Union[int, float]]] = None) -> Union[T, Union[int, float]]`
-finds maximum
+#### `.max(selector: optional[selector[...]] = none) -> t`
+finds the maximum value or element.
 
 ### extended statistical operations
 
-#### `.median(selector: Optional[Selector[T, Union[int, float]]] = None) -> float`
-calculates median value
+#### `.std_dev(selector: optional[selector[...]] = none) -> float`
+calculates the standard deviation.
 
-```python
-numbers.median()
-people.median(lambda p: p['salary'])
-```
+#### `.median(selector: optional[selector[...]] = none) -> float`
+calculates the median value.
 
-#### `.std_dev(selector: Optional[Selector[T, Union[int, float]]] = None) -> float`
-calculates standard deviation
-
-#### `.percentile(q: float, selector: Optional[Selector[T, Union[int, float]]] = None) -> float`
-calculates percentile (q between 0-100)
+#### `.percentile(q: float, selector: optional[selector[...]] = none) -> float`
+calculates the q-th percentile (where q is between 0 and 100).
 
 ```python
 numbers.percentile(75)  # 75th percentile
 ```
 
-#### `.mode(selector: Optional[Selector[T, K]] = None) -> K`
-finds most frequent element
+#### `.mode(selector: optional[selector[t, k]] = none) -> k`
+finds the most frequent element (the mode).
 
 ### rolling window operations
 
-#### `.rolling_window(window_size: int, aggregator: Callable[[List[T]], U]) -> Enumerable[U]`
-applies aggregator to rolling windows
+#### `.rolling_window(window_size: int, aggregator: callable[[list[t]], u]) -> enumerable[u]`
+applies a custom aggregator function to rolling windows.
 
 ```python
-numbers.rolling_window(3, lambda w: sum(w) / len(w))  # rolling average
+# rolling average
+numbers.rolling_window(3, lambda w: sum(w) / len(w))
 ```
 
-#### `.rolling_sum(window_size: int, selector=None) -> Enumerable[Union[int, float]]`
-rolling sum over windows
+#### `.rolling_sum(window_size: int, selector=none) -> enumerable[union[int, float]]`
+calculates a rolling sum over windows.
 
-#### `.rolling_average(window_size: int, selector=None) -> Enumerable[float]`
-rolling average over windows
+#### `.rolling_average(window_size: int, selector=none) -> enumerable[float]`
+calculates a rolling average over windows.
 
 ### time series operations
 
-#### `.lag(periods: int = 1, fill_value: Optional[T] = None) -> Enumerable[Optional[T]]`
-shifts elements by periods
+#### `.lag(periods: int = 1, fill_value: optional[t] = none) -> enumerable[optional[t]]`
+shifts elements back by a number of periods, filling the gap.
 
 ```python
-values.lag(2, 0)  # shift right by 2, fill with 0
+pinqy([1,2,3,4]).lag(2, 0).to_list() # [0, 0, 1, 2]
 ```
 
-#### `.lead(periods: int = 1, fill_value: Optional[T] = None) -> Enumerable[Optional[T]]`
-shifts elements forward
-
-#### `.diff(periods: int = 1) -> Enumerable[T]`
-difference with previous elements
+#### `.lead(periods: int = 1, fill_value: optional[t] = none) -> enumerable[optional[t]]`
+shifts elements forward by a number of periods, filling the gap.
 
 ```python
-prices.diff()  # price changes
+pinqy([1,2,3,4]).lead(2, 0).to_list() # [3, 4, 0, 0]
+```
+
+#### `.diff(periods: int = 1) -> enumerable[t]`
+calculates the difference between an element and a previous element.
+
+```python
+prices = pinqy([10, 12, 11, 15])
+prices.diff().to_list() # [2, -1, 4]
 ```
 
 ### cumulative operations
 
-#### `.cumulative_sum(selector=None) -> Enumerable[Union[int, float]]`
-cumulative sum
+#### `.cumulative_sum(selector=none) -> enumerable[union[int, float]]`
+calculates the cumulative sum of the sequence.
 
 ```python
-numbers.cumulative_sum().to_list()  # [1, 3, 6, 10, 15, ...]
+pinqy([1, 2, 3, 4]).cumulative_sum().to_list()  # [1, 3, 6, 10]
 ```
 
-#### `.cumulative_product(selector=None) -> Enumerable[Union[int, float]]`
-cumulative product
+#### `.cumulative_product(selector=none) -> enumerable[union[int, float]]`
+calculates the cumulative product.
 
-#### `.cumulative_max(selector=None) -> Enumerable[K]`
-cumulative maximum
+#### `.cumulative_max(selector=none) -> enumerable[k]`
+finds the cumulative maximum.
 
-#### `.cumulative_min(selector=None) -> Enumerable[K]`
-cumulative minimum
+#### `.cumulative_min(selector=none) -> enumerable[k]`
+finds the cumulative minimum.
 
 ### ranking operations
 
-#### `.rank(selector=None, ascending: bool = True) -> Enumerable[int]`
-rank elements
+#### `.rank(selector=none, ascending: bool = true) -> enumerable[int]`
+assigns a 1-based rank to each element. ties get the same rank, and the next rank is skipped.
 
 ```python
-scores.rank()  # 1-based ranking
+scores = pinqy([10, 30, 20, 30])
+scores.rank(ascending=false).to_list() # [4, 1, 3, 1]
 ```
 
-#### `.dense_rank(selector=None, ascending: bool = True) -> Enumerable[int]`
-dense ranking (no gaps for ties)
+#### `.dense_rank(selector=none, ascending: bool = true) -> enumerable[int]`
+assigns a 1-based rank. ties get the same rank, but no gaps appear in the rank sequence.
 
-#### `.quantile_cut(q: int, selector=None) -> Enumerable[int]`
-cut into quantile bins
+```python
+scores.dense_rank(ascending=false).to_list() # [3, 1, 2, 1]
+```
+
+#### `.quantile_cut(q: int, selector=none) -> enumerable[int]`
+bins elements into a specified number of quantiles (e.g., q=4 for quartiles).
 
 ### sampling operations
 
-#### `.sample(n: int, replace: bool = False, random_state: Optional[int] = None) -> Enumerable[T]`
-random sampling
+#### `.sample(n: int, replace: bool = false, random_state: optional[int] = none) -> enumerable[t]`
+takes a random sample of elements from the sequence.
 
 ```python
-data.sample(10, replace=True, random_state=42)
+data.sample(10, replace=true, random_state=42)
 ```
 
-#### `.stratified_sample(key_selector, samples_per_group: int) -> Enumerable[T]`
-stratified sampling ensuring representation
+#### `.stratified_sample(key_selector, samples_per_group: int) -> enumerable[t]`
+performs stratified sampling, taking a random sample from each group to ensure representation.
 
-#### `.bootstrap_sample(n_samples: int = 1000, sample_size: Optional[int] = None) -> Enumerable[Enumerable[T]]`
-bootstrap sampling for confidence intervals
+#### `.bootstrap_sample(n_samples: int = 1000, sample_size: optional[int] = none) -> enumerable[enumerable[t]]`
+generates multiple bootstrap samples (sampling with replacement).
 
-### normalization operations
+### normalization and outlier detection
 
-#### `.normalize(selector=None) -> Enumerable[float]`
-min-max normalization (0-1 scale)
+#### `.normalize(selector=none) -> enumerable[float]`
+applies min-max normalization to scale data to a 0-1 range.
 
-```python
-values.normalize()  # scales to 0-1 range
-```
+#### `.standardize(selector=none) -> enumerable[float]`
+applies z-score standardization to give data a mean of 0 and standard deviation of 1.
 
-#### `.standardize(selector=None) -> Enumerable[float]`
-z-score standardization (mean=0, std=1)
-
-#### `.outliers_iqr(selector=None, factor: float = 1.5) -> Enumerable[T]`
-detect outliers using iqr method
+#### `.outliers_iqr(selector=none, factor: float = 1.5) -> enumerable[t]`
+detects and returns outliers using the interquartile range (iqr) method.
 
 ### combinatorial operations
 
-#### `.permutations(r: Optional[int] = None) -> Enumerable[List[T]]`
-generates permutations
+#### `.permutations(r: optional[int] = none) -> enumerable[tuple[t, ...]]`
+generates all permutations of the sequence.
 
 ```python
 pinqy(['a', 'b', 'c']).permutations(2).to_list()
-# [['a', 'b'], ['a', 'c'], ['b', 'a'], ['b', 'c'], ['c', 'a'], ['c', 'b']]
+# [('a', 'b'), ('a', 'c'), ('b', 'a'), ('b', 'c'), ('c', 'a'), ('c', 'b')]
 ```
 
-#### `.combinations(r: int) -> Enumerable[List[T]]`
-generates combinations
+#### `.combinations(r: int) -> enumerable[tuple[t, ...]]`
+generates all unique combinations of a given length.
 
 ```python
 pinqy(['a', 'b', 'c']).combinations(2).to_list()
-# [['a', 'b'], ['a', 'c'], ['b', 'c']]
+# [('a', 'b'), ('a', 'c'), ('b', 'c')]
 ```
 
-#### `.cartesian_product(*others) -> Enumerable[List[Union[T, U]]]`
-cartesian product with multiple sequences
+#### `.combinations_with_replacement(r: int) -> enumerable[tuple[t, ...]]`
+generates combinations where elements can be re-selected.
+
+#### `.power_set() -> enumerable[tuple[t, ...]]`
+generates the power set (all possible subsets) of the sequence.
+
+#### `.cartesian_product(*others) -> enumerable[tuple[any, ...]]`
+computes the cartesian product with one or more other sequences.
 
 #### `.binomial_coefficient(r: int) -> int`
-calculates n choose r
+calculates "n choose r", where n is the number of items in the sequence.
 
-### structural operations
-
-#### `.flatten(depth: int = 1) -> Enumerable[Any]`
-flattens nested sequences
+#### `.run_length_encode() -> enumerable[tuple[t, int]]`
+encodes the sequence by grouping consecutive identical elements into (element, count) tuples.
 
 ```python
-nested.flatten(2)  # flattens 2 levels deep
+pinqy(['a', 'a', 'b', 'c', 'c', 'c']).run_length_encode().to_list()
+# [('a', 2), ('b', 1), ('c', 3)]
 ```
 
-#### `.transpose() -> Enumerable[List[T]]`
-transposes matrix-like structure
+### advanced operations
 
-#### `.intersperse(separator: T) -> Enumerable[T]`
-intersperses separator between elements
+#### `.append(element: t) -> enumerable[t]`
+appends a value to the end of the sequence.
+
+#### `.prepend(element: t) -> enumerable[t]`
+adds a value to the beginning of the sequence.
+
+#### `.default_if_empty(default_value: t) -> enumerable[t]`
+returns the sequence, or a sequence containing only the default value if it's empty.
+
+#### `.memoize() -> enumerable[t]`
+evaluates the chain and caches the result. subsequent operations start from the cached state.
+
+#### `.pipe(func: callable[..., u], *args, **kwargs) -> u`
+pipes the enumerable object into an external function, allowing for custom, chainable operations.
 
 ```python
-pinqy([1, 2, 3]).intersperse(0).to_list()  # [1, 0, 2, 0, 3]
+data.pipe(my_custom_plot_function, title='my data')
 ```
 
-#### `.batch_by(key_selector) -> Enumerable[List[T]]`
-batches consecutive elements with same key
+#### `.side_effect(action: callable[[t], any]) -> enumerable[t]`
+performs a side-effect (like printing) for each element without modifying the sequence. useful for debugging.
+
+```python
+numbers.where(...).side_effect(print).select(...).to_list()
+```
+
+#### `.topological_sort(dependency_selector: callable[[t], iterable[t]]) -> enumerable[t]`
+performs a topological sort on the sequence, assuming it represents nodes in a dag.
+- **edge case**: raises `valueerror` if a cycle is detected.
 
 ### terminal operations
 
-#### `.to_list() -> List[T]`
-converts to list (materializes)
+#### `.to_list() -> list[t]`
+converts the sequence to a list, materializing the results.
 
 #### `.to_array() -> np.ndarray`
-converts to numpy array
+converts to a numpy array.
 
-#### `.to_set() -> Set[T]`
-converts to set
+#### `.to_set() -> set[t]`
+converts to a set.
 
-#### `.to_dict(key_selector, value_selector=None) -> Dict[K, V]`
-converts to dictionary
+#### `.to_dict(key_selector, value_selector=none) -> dict[k, v]`
+converts to a dictionary.
 
 ```python
 people.to_dict(lambda p: p['id'], lambda p: p['name'])
 ```
 
-#### `.to_pandas() -> pd.Series`
-converts to pandas series
+#### `.to_pandas() -> pd.series`
+converts to a pandas series.
 
-#### `.count(predicate: Optional[Predicate[T]] = None) -> int`
-counts elements
+#### `.to_df() -> pd.dataframe`
+converts to a pandas dataframe.
 
-```python
-numbers.count()  # total count
-numbers.count(lambda x: x > 5)  # conditional count
-```
-
-#### `.any(predicate: Optional[Predicate[T]] = None) -> bool`
-checks if any element satisfies condition
+#### `.count(predicate: optional[predicate[t]] = none) -> int`
+counts elements, optionally matching a predicate.
 
 ```python
-numbers.any()  # has any elements?
-numbers.any(lambda x: x > 10)  # any greater than 10?
+numbers.count()  # 10
+numbers.count(lambda x: x > 5)  # 5
 ```
 
-#### `.all(predicate: Predicate[T]) -> bool`
-checks if all elements satisfy condition
-
-#### `.first(predicate: Optional[Predicate[T]] = None) -> T`
-gets first element
-- **edge case**: raises error if no element found
+#### `.any(predicate: optional[predicate[t]] = none) -> bool`
+checks if any element exists, optionally matching a predicate.
 
 ```python
-numbers.first()  # first element
-numbers.first(lambda x: x > 5)  # first > 5
+numbers.any()  # true
+numbers.any(lambda x: x > 10)  # false
 ```
 
-#### `.first_or_default(predicate=None, default=None) -> Optional[T]`
-gets first element or default
-
-#### `.single(predicate=None) -> T`
-gets single element
-- **edge case**: raises error if 0 or >1 elements
-
-#### `.aggregate(accumulator, seed=None) -> T`
-applies accumulator function
+#### `.all(predicate: predicate[t]) -> bool`
+checks if all elements satisfy a condition.
 
 ```python
-numbers.aggregate(lambda acc, x: acc + x, 0)  # sum with seed
-numbers.aggregate(lambda acc, x: acc * x)     # product without seed
+numbers.all(lambda x: x > 0) # true
 ```
 
-#### `.aggregate_with_selector(seed, accumulator, result_selector) -> V`
-aggregates with final transformation
+#### `.first(predicate: optional[predicate[t]] = none) -> t`
+gets the first element, optionally matching a predicate.
+- **edge case**: raises `valueerror` if no element is found.
 
-## usage patterns
+#### `.first_or_default(predicate=none, default=none) -> optional[t]`
+gets the first element or a default value if not found.
 
-### chaining operations
+#### `.single(predicate=none) -> t`
+gets the single element that matches a condition.
+- **edge case**: raises `valueerror` if zero or more than one element is found.
+
+#### `.aggregate(accumulator, seed=none) -> t`
+applies an accumulator function over the sequence (a fold or reduce operation).
 
 ```python
-result = (pinqy(data)
-    .where(lambda x: x.is_valid)
-    .select(lambda x: x.transform())
-    .group_by(lambda x: x.category)
-    .items())
+# sum with a seed
+numbers.aggregate(lambda acc, x: acc + x, 0)
+# product without a seed
+pinqy([1,2,3,4]).aggregate(lambda acc, x: acc * x) # 24
 ```
 
-### complex business logic
-
-```python
-high_value_customers = (
-    pinqy(customers)
-    .where(lambda c: c['total_orders'] > 10)
-    .where(lambda c: c['avg_order_value'] > 100)
-    .join(regions, 
-          lambda c: c['region_id'],
-          lambda r: r['id'],
-          lambda c, r: {
-              'customer': c['name'],
-              'region': r['name'],
-              'value': c['lifetime_value']
-          })
-    .order_by_descending(lambda x: x['value'])
-    .take(10)
-    .to_list()
-)
-```
-
-### statistical analysis
-
-```python
-sales_analysis = (
-    pinqy(sales_data)
-    .select(lambda s: s['amount'])
-    .where(lambda a: a > 0)  # remove refunds
-)
-
-stats = {
-    'mean': sales_analysis.average(),
-    'median': sales_analysis.median(),
-    'std': sales_analysis.std_dev(),
-    'p95': sales_analysis.percentile(95),
-    'outliers': sales_analysis.outliers_iqr().count()
-}
-```
-
-## performance considerations
-
-### numpy optimization
-- automatically used for numeric operations on `where`, `select`, `distinct`
-- works with lists of `int`, `float`, `complex`
-- fallback to pure python if optimization fails
-
-### lazy evaluation
-- operations build pipeline without execution
-- only terminal operations trigger computation
-- enables efficient memory usage with large datasets
-
-### caching
-- results cached after first materialization
-- subsequent operations on same enumerable reuse cache
-- cache invalidated only when creating new enumerable
-
-### memory efficiency
-- streaming operations don't load entire dataset
-- `take` and `skip` enable pagination
-- window operations process chunks, not full dataset
-
-## error handling
-
-### empty sequences
-- `average`, `min`, `max`, `first`, `single` raise `ValueError` on empty sequences
-- use `first_or_default` for safe access
-- `any()` returns `False`, `count()` returns `0` for empty sequences
-
-### type safety
-- generic type hints throughout
-- runtime type checking minimal for performance
-- mixed types handled gracefully where possible
-
-### null handling
-- operations generally propagate nulls
-- use `.where(lambda x: x is not None)` to filter nulls
-- aggregations ignore null values when possible
-
-## examples
-
-### data analysis pipeline
-
-```python
-# analyze sales data
-sales_summary = (
-    pinqy(sales_records)
-    .where(lambda s: s['date'] >= start_date)
-    .select(lambda s: {
-        **s,
-        'revenue': s['quantity'] * s['price'],
-        'quarter': get_quarter(s['date'])
-    })
-    .group_by(lambda s: s['quarter'])
-)
-
-for quarter, records in sales_summary.items():
-    quarter_revenue = sum(r['revenue'] for r in records)
-    print(f"Q{quarter}: ${quarter_revenue:,}")
-```
-
-### machine learning preprocessing
-
-```python
-# normalize features and split data
-features_normalized = (
-    pinqy(raw_features)
-    .select(lambda row: [float(x) for x in row])  # ensure numeric
-    .transpose()  # transpose to work column-wise
-    .select(lambda col: pinqy(col).normalize().to_list())  # normalize each column
-    .transpose()  # transpose back
-    .to_array()
-)
-
-train_data, test_data = (
-    pinqy(features_normalized)
-    .zip_with(labels, lambda feat, label: (feat, label))
-    .sample(len(features_normalized), random_state=42)
-    .partition(lambda _, i=iter(range(len(features_normalized))): next(i) < 0.8 * len(features_normalized))
-)
-```
-
-### text processing
-
-```python
-# word frequency analysis
-word_freq = (
-    pinqy(documents)
-    .select_many(lambda doc: doc.lower().split())
-    .where(lambda word: len(word) > 3)
-    .group_by(lambda word: word)
-)
-
-top_words = (
-    pinqy(word_freq.items())
-    .select(lambda item: {'word': item[0], 'count': len(item[1])})
-    .order_by_descending(lambda item: item['count'])
-    .take(10)
-    .to_list()
-)
-```
+#### `.aggregate_with_selector(seed, accumulator, result_selector) -> v`
+aggregates with a seed and a final transformation of the result.
