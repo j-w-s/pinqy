@@ -370,6 +370,23 @@ people.group.group_by_with_aggregate(
 ) # returns {'new york': 95000, 'london': 88000}
 ```
 
+#### `.group.pivot(row_selector, column_selector, aggregator) -> dict[k, dict[u, v]]`
+creates a pivot table, grouping by rows and columns and aggregating cell values.
+
+```python
+sales = p([
+    {'year': 2023, 'product': 'a', 'sales': 100},
+    {'year': 2023, 'product': 'b', 'sales': 150},
+    {'year': 2024, 'product': 'a', 'sales': 120},
+])
+sales.group.pivot(
+    row_selector=lambda r: r['year'],
+    column_selector=lambda r: r['product'],
+    aggregator=lambda g: g.stats.sum(lambda s: s['sales'])
+)
+# returns: {2023: {'a': 100, 'b': 150}, 2024: {'a': 120}}
+```
+
 ### join operations
 
 #### `.join.join(inner, outer_key_selector, inner_key_selector, result_selector) -> enumerable[v]`
@@ -412,19 +429,19 @@ colors.join.cross_join(sizes)  # all color-size combinations
 
 ### zip operations
 
-#### `.join.zip_with(other, result_selector) -> enumerable[v]`
+#### `.zip.zip_with(other, result_selector) -> enumerable[v]`
 zips two sequences with a custom result selector.
 
 ```python
-pinqy([1, 2]).join.zip_with(['a', 'b'], lambda n, l: f"{n}{l}").to.list()
+pinqy().zip.zip_with(['a', 'b'], lambda n, l: f"{n}{l}").to.list()
 # ['1a', '2b']
 ```
 
-#### `.join.zip_longest_with(other, result_selector, default_self=none, default_other=none) -> enumerable[v]`
+#### `.zip.zip_longest_with(other, result_selector, default_self=none, default_other=none) -> enumerable[v]`
 zips sequences, padding the shorter one with default values.
 
 ```python
-p([1,2]).join.zip_longest_with(['a'], lambda n,l: f"{n}{l}", default_self=0, default_other='z').to.list()
+p().zip.zip_longest_with(['a'], lambda n,l: f"{n}{l}", default_self=0, default_other='z').to.list()
 # ['1a', '2z']
 ```
 

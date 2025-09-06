@@ -2,6 +2,7 @@ from __future__ import annotations
 import typing
 from collections import deque
 from ..types import *
+from collections import deque
 
 if typing.TYPE_CHECKING:
     from ..enumerable import Enumerable
@@ -26,17 +27,17 @@ class TreeAccessor(Generic[T]):
         from ..enumerable import Enumerable
         def recursive_data():
             result = []
-            stack = list(self._enumerable._get_data())
+            stack = deque(self._enumerable._get_data())
             initial_count = len(stack)
 
             while stack:
-                item = stack.pop(0)  # use pop(0) for depth-first order
+                item = stack.popleft()  #  O(1)
                 result.append(item)
 
                 children = child_selector(item)
                 if children is not None:
                     # insert children at the beginning of the stack
-                    stack[:0] = list(children)
+                    stack.extendleft(reversed(list(children)))  # reversed() maintains order
 
             return result if include_parents else result[initial_count:]
 

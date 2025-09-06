@@ -3,6 +3,7 @@ import typing
 from collections import defaultdict
 from itertools import batched
 from ..types import *
+from ..factories import from_iterable
 
 if typing.TYPE_CHECKING:
     from ..enumerable import Enumerable
@@ -116,3 +117,39 @@ class GroupingAccessor(Generic[T]):
             result.append(current_batch)
             return result
         return Enumerable(batch_data)
+
+    def pivot(self,
+              row_selector: KeySelector[T, K],
+              column_selector: KeySelector[T, U],
+              aggregator: Callable[[Enumerable[T]], V]) -> Dict[K, Dict[U, V]]:
+        """
+        creates a pivot table-like dictionary from the enumerable.
+
+        groups elements by a row key, then by a column key, and finally
+        applies an aggregator function to the items in each cell.
+
+        :param row_selector: function to extract the row key from an element.
+        :param column_selector: function to extract the column key from an element.
+        :param aggregator: function that takes an enumerable of items for a
+                           given (row, column) cell and computes a single value.
+        :return: a nested dictionary representing the pivot table.
+        """
+        # group by the selected row key. this creates the primary dictionary.
+        row_groups = self.group_by(row_selector)
+
+        # process each row group to create the nested column dictionary.
+        pivot_table = {}
+        for row_key, row_items in row_groups.items():
+            # wrap the items for the current row in an enumerable
+            row_enumerable = from_iterable(row_items)
+
+            # group this row's items by the column key.
+            col_groups = row_enumerable.group.group_by(column_selector)
+
+            # apply the aggregator to each column group (cell) to get the final value.
+            pivot_table[row_key] = {
+                col_key: aggregator(from_iterable(col_items))
+                for col_key, col_items in col_groups.items()
+            }
+
+        return pivot_table

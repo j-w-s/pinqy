@@ -20,6 +20,7 @@ from .extensions.combinatorics import CombinatoricsAccessor
 from .extensions.utility import UtilityAccessor
 from .extensions.terminal import TerminalAccessor
 from .extensions.tree import TreeAccessor
+from .extensions.zip import ZipAccessor
 
 # --- abstract base class ---
 
@@ -90,6 +91,7 @@ class Enumerable(
         # --- initialize accessors ---
         self.set = SetAccessor(self)
         self.join = JoinAccessor(self)
+        self.zip = ZipAccessor(self)
         self.group = GroupingAccessor(self)
         self.stats = StatsAccessor(self)
         self.comb = CombinatoricsAccessor(self)
