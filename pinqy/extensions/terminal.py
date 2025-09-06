@@ -70,10 +70,12 @@ class TerminalAccessor(Generic[T]):
         except ValueError: return default
 
     def single(self, predicate: Optional[Predicate[T]] = None) -> T:
-        """get single element, erroring if not exactly one"""
+        """gets the single element that matches a condition."""
         data = [x for x in self._enumerable._get_data() if predicate(x)] if predicate else self._enumerable._get_data()
-        if len(data) == 0: raise ValueError("sequence contains no matching elements")
-        if len(data) > 1: raise ValueError("sequence contains more than one matching element")
+        if len(data) == 0:
+            raise ValueError("sequence contains no matching elements")
+        if len(data) > 1:
+            raise ValueError(f"sequence contains {len(data)} matching elements instead of one")
         return data[0]
 
     def aggregate(self, accumulator: Accumulator[T, T], seed: Optional[T] = None) -> T:

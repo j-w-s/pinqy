@@ -196,20 +196,22 @@ secondary sort in descending order.
 people.order_by(lambda p: p['city']).then_by_descending(lambda p: p['salary'])
 ```
 
-#### `.find_by_key(*key_prefix: any) -> enumerable[t]`
-efficiently finds items matching a key prefix using binary search (o(log n)).
-- **edge case**: raises `notimplementederror` if any searched keys are sorted descending.
+#### .find_by_key(*key_prefix: any) -> enumerable[t]
+efficiently finds items matching a key prefix using binary search (o(log n)). supports sequences sorted in ascending, descending, or mixed directions.
 
 ```python
 users.order_by(lambda u: u.state).then_by(lambda u: u.city).find_by_key("ca", "los angeles")
 ```
 
-#### `.between_keys(lower_bound: union[any, tuple], upper_bound: union[any, tuple]) -> enumerable[t]`
+#### .between_keys(lower_bound: union[any, tuple], upper_bound: union[any, tuple]) -> enumerable[t]
 efficiently gets a slice of items where the sort key(s) are between the bounds.
-- **edge case**: raises `notimplementederror` if sorted descending.
 
 ```python
+# ascending example
 products.order_by(lambda p: p.price).between_keys(10.00, 49.99)
+
+# descending example
+products.order_by_descending(lambda p: p.price).between_keys(49.99, 10.00)
 ```
 
 #### `.merge_with(other: orderedenumerable[t]) -> enumerable[t]`
@@ -435,15 +437,19 @@ splits elements into two lists based on a predicate.
 evens, odds = numbers.group.partition(lambda x: x % 2 == 0)
 ```
 
-#### `.group.chunk(size: int) -> enumerable[list[t]]`
+#### .group.chunk(size: int) -> enumerable[list[t]]
 splits into chunks of a specified size.
 
 ```python
 numbers.group.chunk(3).to.list()  # [[1,2,3], [4,5,6], [7,8,9], [10]]
 ```
 
-#### `.group.batched(size: int) -> enumerable[tuple[t, ...]]`
+### .group.batched(size: int) -> enumerable[tuple[t, ...]]
 batches elements into tuples of a specified size (python 3.12+).
+code
+```python
+numbers.group.batched(3).to.list() # [(1,2,3), (4,5,6), (7,8,9), (10,)]
+```
 
 #### `.group.window(size: int) -> enumerable[list[t]]`
 creates sliding windows of elements.
@@ -726,8 +732,8 @@ pipes the enumerable object into an external function, allowing for custom, chai
 data.util.pipe(my_custom_plot_function, title='my data')
 ```
 
-#### `.util.side_effect(action: callable[[t], any]) -> enumerable[t]`
-performs a side-effect (like printing) for each element without modifying the sequence. useful for debugging.
+#### .util.side_effect(action: callable[[t], any]) -> enumerable[t]
+performs a side-effect (like printing) for each element without modifying the sequence. this operation is lazy, making it useful for debugging a pipeline without forcing early materialization.
 
 ```python
 numbers.where(...).util.side_effect(print).select(...).to.list()
@@ -791,11 +797,11 @@ gets the first element, optionally matching a predicate.
 #### `.to.first_or_default(predicate=none, default=none) -> optional[t]`
 gets the first element or a default value if not found.
 
-#### `.to.single(predicate=none) -> t`
+#### .to.single(predicate=none) -> t
 gets the single element that matches a condition.
 - **edge case**: raises `valueerror` if zero or more than one element is found.
 
-#### `.to.aggregate(accumulator, seed=none) -> t`
+#### .to.aggregate(accumulator, seed=none) -> t
 applies an accumulator function over the sequence (a fold or reduce operation).
 
 ```python

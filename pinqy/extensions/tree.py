@@ -30,12 +30,12 @@ class TreeAccessor(Generic[T]):
             initial_count = len(stack)
 
             while stack:
-                item = stack.pop(0)  # Use pop(0) for depth-first order
+                item = stack.pop(0)  # use pop(0) for depth-first order
                 result.append(item)
 
                 children = child_selector(item)
                 if children is not None:
-                    # Insert children at the beginning of the stack
+                    # insert children at the beginning of the stack
                     stack[:0] = list(children)
 
             return result if include_parents else result[initial_count:]

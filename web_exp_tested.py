@@ -35,7 +35,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ExplorationConfig:
-    # ... (no changes in this class)
     max_depth: int = 3
     max_pages_per_domain: int = 100
     delay_between_requests: float = 1.0
@@ -60,7 +59,6 @@ def create_session(config: ExplorationConfig) -> requests.Session:
 
 
 def check_robots_txt(domain: str, session: requests.Session) -> Callable[[str], bool]:
-    # ... (no changes in this function)
     try:
         rp = RobotFileParser(f"https://{domain}/robots.txt")
         rp.read()
@@ -107,7 +105,6 @@ def parse_sitemap(soup: BeautifulSoup) -> List[str]:
 
 
 def element_to_functional_dict(element) -> Optional[Dict[str, Any]]:
-    # ... (no changes in this function)
     if not hasattr(element, 'name'):
         text_content = str(element).strip()
         if not text_content: return None
@@ -132,7 +129,6 @@ def element_to_functional_dict(element) -> Optional[Dict[str, Any]]:
 
 
 def set_element_depths(tree_dict: Dict[str, Any], depth: int = 0) -> Dict[str, Any]:
-    # ... (no changes in this function)
     if not tree_dict: return None
     result = {**tree_dict, 'depth': depth}
     if result.get('children'):
@@ -141,7 +137,6 @@ def set_element_depths(tree_dict: Dict[str, Any], depth: int = 0) -> Dict[str, A
 
 
 def page_to_functional_tree(soup: BeautifulSoup, base_url: str) -> Optional[Dict[str, Any]]:
-    # ... (no changes in this function)
     body = soup.body if soup.body else soup
     tree = element_to_functional_dict(body)
     if not tree: return None
@@ -154,7 +149,6 @@ def page_to_functional_tree(soup: BeautifulSoup, base_url: str) -> Optional[Dict
 
 
 def extract_all_elements(tree_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
-    # ... (no changes in this function)
     if not tree_dict or tree_dict.get('type') != 'element': return []
     elements = [tree_dict]
     elements.extend(pinqy(tree_dict.get('children', [])).select_many(extract_all_elements).to.list())
@@ -162,7 +156,6 @@ def extract_all_elements(tree_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def create_structural_signature(elem: Dict[str, Any]) -> str:
-    # ... (no changes in this function)
     if elem.get('type') != 'element': return 'text'
     tag = elem.get('tag', '')
     class_sig = '.'.join(sorted(elem.get('classes', []))[:3])
@@ -176,7 +169,6 @@ def create_structural_signature(elem: Dict[str, Any]) -> str:
 
 
 def discover_repeating_patterns(tree_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
-    # ... (no changes in this function)
     all_elements = pinqy(extract_all_elements(tree_dict))
     if not all_elements.to.any(): return []
     signature_groups = all_elements.group.group_by(create_structural_signature)
@@ -191,7 +183,6 @@ def discover_repeating_patterns(tree_dict: Dict[str, Any]) -> List[Dict[str, Any
 
 
 def analyze_page_semantics(tree: Dict[str, Any]) -> Dict[str, Any]:
-    # ... (no changes in this function)
     full_text = " ".join(pinqy(extract_all_elements(tree)).select(lambda e: e.get('text', '')).to.list()).lower()
     product_keywords = {'price', 'cart', 'add', 'sku', 'sale', '$', '€', '£'}
     article_keywords = {'author', 'published', 'updated', 'by', 'copyright', 'comments'}
@@ -205,7 +196,6 @@ def analyze_page_semantics(tree: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def classify_page_functionally(tree_dict: Dict[str, Any]) -> Dict[str, Any]:
-    # ... (no changes in this function)
     if not tree_dict: return {'type': 'invalid', 'confidence': 0.0, 'patterns': []}
     patterns = discover_repeating_patterns(tree_dict)
     if not patterns: return {'type': 'simple', 'confidence': 0.3, 'patterns': [],
@@ -231,7 +221,6 @@ def classify_page_functionally(tree_dict: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def traverse_and_extract(element: Dict[str, Any], path: str) -> Optional[str]:
-    # ... (no changes in this function)
     try:
         parts = path.strip('.').split('.')
         current = element
@@ -248,7 +237,6 @@ def traverse_and_extract(element: Dict[str, Any], path: str) -> Optional[str]:
 
 
 def discover_data_fields_functional(elements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    # ... (no changes in this function)
     if not elements: return []
     sample_elements = pinqy(elements).take(10)
     num_samples = sample_elements.to.count()
@@ -334,7 +322,6 @@ def process_url_functionally(url: str, session: requests.Session, robots_checker
 
 
 def explore_domain_functionally(start_urls: List[str], config: ExplorationConfig) -> Dict[str, Any]:
-    # ... (no changes in this function)
     if not start_urls: return {'error': 'no start urls provided'}
     domain = urlparse(start_urls[0]).netloc
     logger.info(f"exploring domain: {domain}")
@@ -381,7 +368,6 @@ def explore_domain_functionally(start_urls: List[str], config: ExplorationConfig
 
 
 def analyze_exploration_results(exploration_results: Dict[str, Any]) -> Dict[str, Any]:
-    # ... (no changes in this function)
     results = pinqy(exploration_results.get('results', []))
     if not results.to.any(): return {'error': 'no results to analyze'}
     page_type_analysis = results.group.group_by(lambda r: r['classification']['type'])
@@ -419,7 +405,6 @@ def analyze_exploration_results(exploration_results: Dict[str, Any]) -> Dict[str
 
 
 def export_results(exploration_results: Dict[str, Any], config: ExplorationConfig) -> str:
-    # ... (no changes in this function)
     domain = exploration_results.get('domain', 'unknown')
     filename = config.output_file or f"exploration_{domain}_{datetime.now():%Y%m%d_%H%M%S}.{config.output_format}"
     if config.output_format == 'json':
@@ -456,7 +441,6 @@ def export_results(exploration_results: Dict[str, Any], config: ExplorationConfi
 
 
 class FunctionalQueryBuilder:
-    # ... (no changes in this class)
     def __init__(self, exploration_results: Dict[str, Any]):
         self.results = pinqy(exploration_results.get('results', []))
         self.current_query = self.results
@@ -521,7 +505,6 @@ class FunctionalQueryBuilder:
 
 
 def create_cli_interface():
-    # ... (no changes in this function)
     import argparse
     parser = argparse.ArgumentParser(description='Functional Web Graph Explorer',
                                      epilog='Examples:\n  python web_exp.py https://pokemondb.net/pokedex/all --max-pages 50\n  python web_exp.py https://books.toscrape.com --output csv')
@@ -540,7 +523,6 @@ def create_cli_interface():
 
 
 def interactive_query_session(exploration_results: Dict[str, Any]):
-    # ... (no changes in this function)
     print(f"\n{_c.info}=== Interactive Query Mode ==={_c.reset}")
     print(f"  {_c.ok}.type <type>{_c.reset}        - filter by page type (e.g., .type product_list)")
     print(f"  {_c.ok}.select_data{_c.reset}        - transform query to data items")
@@ -580,7 +562,6 @@ def interactive_query_session(exploration_results: Dict[str, Any]):
 
 
 def main():
-    # ... (no changes in this function)
     parser = create_cli_interface()
     args = parser.parse_args()
     if args.verbose: logging.getLogger().setLevel(logging.DEBUG)

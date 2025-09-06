@@ -56,9 +56,27 @@ class GroupingAccessor(Generic[T]):
         return true_items, false_items
 
     def chunk(self, size: int) -> 'Enumerable[List[T]]':
-        """split into chunks of specified size"""
+        """splits into chunks of a specified size. returns an enumerable of lists."""
         from ..enumerable import Enumerable
-        return Enumerable(lambda: [self._enumerable._get_data()[i:i + size] for i in range(0, len(self._enumerable._get_data()), size)])
+        if size <= 0:
+            raise ValueError("chunk size must be positive")
+        return Enumerable(lambda: [self._enumerable._get_data()[i:i + size] for i in
+                                   range(0, len(self._enumerable._get_data()), size)])
+
+    def batched(self, size: int) -> 'Enumerable[Tuple[T, ...]]':
+        """
+        batches elements into tuples of a specified size (python 3.12+).
+        the last batch may be smaller than the requested size. returns an enumerable of tuples.
+        """
+        from ..enumerable import Enumerable
+        if size <= 0:
+            raise ValueError("batch size must be positive")
+
+        def batched_data():
+            # directly use itertools.batched which yields tuples
+            return list(batched(self._enumerable._get_data(), size))
+
+        return Enumerable(batched_data)
 
     def window(self, size: int) -> 'Enumerable[List[T]]':
         """create sliding windows of specified size"""
@@ -98,16 +116,3 @@ class GroupingAccessor(Generic[T]):
             result.append(current_batch)
             return result
         return Enumerable(batch_data)
-
-    def batched(self, size: int) -> 'Enumerable[Tuple[T, ...]]':
-        """
-        batches elements of a sequence into tuples of a specified size. requires python 3.12+.
-        the last batch may be smaller than the requested size.
-        """
-        from ..enumerable import Enumerable
-        if size <= 0:
-            raise ValueError("batch size must be positive")
-        def batched_data():
-            # convert the resulting tuples to lists to maintain the list-of-lists convention of chunk()
-            return [list(batch) for batch in batched(self._enumerable._get_data(), size)]
-        return Enumerable(batched_data)

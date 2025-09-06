@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from functools import total_ordering
+
 import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
@@ -64,6 +67,17 @@ class _BaseEnumerable(IEnumerable[T]):
     def __len__(self) -> int:
         return self.to.count()
 
+# --- private helper for descending sort searches ---
+@total_ordering
+class _ReverseComparable:
+    """wraps an object to invert its comparison operators for bisect."""
+    def __init__(self, obj):
+        self.obj = obj
+    def __eq__(self, other):
+        return self.obj == other.obj
+    def __lt__(self, other):
+        return self.obj > other.obj
+
 # --- main enumerable class ---
 
 class Enumerable(
@@ -124,10 +138,7 @@ class OrderedEnumerable(Enumerable[T]):
     def find_by_key(self, *key_prefix: Any) -> 'Enumerable[T]':
         """
         efficiently finds all items matching a key prefix using binary search (o(log n)).
-
-        example:
-            users.order_by(lambda u: u.state).then_by(lambda u: u.city)
-                 .find_by_key("ca", "los angeles")
+        supports mixed ascending/descending sort keys.
         """
 
         def find_data():
@@ -136,32 +147,31 @@ class OrderedEnumerable(Enumerable[T]):
             if len(key_prefix) > len(self._sort_keys):
                 raise ValueError("more search keys provided than sort levels exist.")
 
-            # check for descending sorts, which bisect cannot handle natively
-            if any(is_desc for _, is_desc in self._sort_keys[:len(key_prefix)]):
-                raise NotImplementedError("find_by_key does not support descending-sorted keys.")
+            desc_flags = [is_desc for _, is_desc in self._sort_keys[:len(key_prefix)]]
+
+            def key_wrapper(item):
+                key = self._get_full_key_selector()(item)[:len(key_prefix)]
+                return tuple(_ReverseComparable(k) if is_desc else k for k, is_desc in zip(key, desc_flags))
+
+            wrapped_prefix = tuple(
+                _ReverseComparable(k) if is_desc else k for k, is_desc in zip(key_prefix, desc_flags))
 
             sorted_data = self._get_data()
-
-            # create a selector that only extracts the part of the key we are searching for
-            prefix_len = len(key_prefix)
-            prefix_selector = lambda item: self._get_full_key_selector()(item)[:prefix_len]
-
-            # use the `key` argument for direct, efficient binary search
-            start_index = bisect_left(sorted_data, key_prefix, key=prefix_selector)
-            end_index = bisect_right(sorted_data, key_prefix, key=prefix_selector)
+            start_index = bisect_left(sorted_data, wrapped_prefix, key=key_wrapper)
+            end_index = bisect_right(sorted_data, wrapped_prefix, key=key_wrapper)
 
             return sorted_data[start_index:end_index]
+
+        return Enumerable(find_data)
 
         return Enumerable(find_data)
 
     def between_keys(self, lower_bound: Union[Any, Tuple], upper_bound: Union[Any, Tuple]) -> 'Enumerable[T]':
         """
         efficiently gets a slice of items where the sort key(s) are between the bounds.
-
-        example:
-            products.order_by(lambda p: p.price).between_keys(10.00, 49.99)
+        the user is responsible for providing bounds in a logical order for the sort
+        direction (e.g., (10, 50) for ascending, (50, 10) for descending).
         """
-
         def between_data():
             if not self._sort_keys:
                 raise TypeError("between_keys requires at least one order_by call.")
@@ -173,14 +183,18 @@ class OrderedEnumerable(Enumerable[T]):
                 raise ValueError("lower and upper bound tuples must have the same length.")
 
             bound_len = len(lower)
-            if any(is_desc for _, is_desc in self._sort_keys[:bound_len]):
-                raise NotImplementedError("between_keys does not support descending-sorted keys.")
+            desc_flags = [is_desc for _, is_desc in self._sort_keys[:bound_len]]
+
+            def key_wrapper(item):
+                key = self._get_full_key_selector()(item)[:bound_len]
+                return tuple(_ReverseComparable(k) if is_desc else k for k, is_desc in zip(key, desc_flags))
+
+            wrapped_lower = tuple(_ReverseComparable(k) if is_desc else k for k, is_desc in zip(lower, desc_flags))
+            wrapped_upper = tuple(_ReverseComparable(k) if is_desc else k for k, is_desc in zip(upper, desc_flags))
 
             sorted_data = self._get_data()
-            bound_selector = lambda item: self._get_full_key_selector()(item)[:bound_len]
-
-            start_index = bisect_left(sorted_data, lower, key=bound_selector)
-            end_index = bisect_right(sorted_data, upper, key=bound_selector)
+            start_index = bisect_left(sorted_data, wrapped_lower, key=key_wrapper)
+            end_index = bisect_right(sorted_data, wrapped_upper, key=key_wrapper)
 
             return sorted_data[start_index:end_index]
 
@@ -211,7 +225,7 @@ class OrderedEnumerable(Enumerable[T]):
                     if k1 > k2: return -1 if is_desc else 1
                 return 0
 
-            # classic two-pointer merge algorithm using the comparator
+            # two-pointer merge algorithm using the comparator
             result = []
             i, j = 0, 0
             while i < len(list_a) and j < len(list_b):

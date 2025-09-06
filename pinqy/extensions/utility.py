@@ -130,17 +130,19 @@ class UtilityAccessor(Generic[T]):
 
     def side_effect(self, action: Callable[[T], Any]) -> 'Enumerable[T]':
         """
-        performs a side-effect action for each element in the sequence without modifying it.
-        primarily used for debugging, e.g., .side_effect(print).
+        performs a side-effect action for each element as it passes through the sequence
+        without modifying it. this operation is lazy and is primarily used for debugging
+        pipelines without materializing the data.
+        example: .where(...).side_effect(print).select(...)
         """
         from ..enumerable import Enumerable
-        def side_effect_data():
-            data = self._enumerable._get_data()
-            for item in data:
+        def lazy_side_effect_generator():
+            # iterate through the source without calling _get_data() to remain lazy
+            for item in self._enumerable:
                 action(item)
-            return data
+                yield item
 
-        return Enumerable(side_effect_data)
+        return Enumerable(lazy_side_effect_generator)
 
     def topological_sort(self, dependency_selector: Callable[[T], Iterable[T]]) -> 'Enumerable[T]':
         """

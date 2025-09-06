@@ -350,15 +350,23 @@ def test_ordered_find():
     assert_that(in_range == [20, 30, 40], "between_keys should return inclusive range")
 
 
-@test("find_by_key raises error on descending sort")
-def test_ordered_find_desc_error():
+@test("find_by_key and between_keys work on descending sort")
+def test_ordered_find_desc():
+    # data is sorted [10, 9, 8, ..., 1]
     data = from_range(1, 10).order_by_descending(lambda x: x)
-    try:
-        data.find_by_key(5)
-        assert_that(False, "find_by_key on descending sort should raise NotImplementedError")
-    except NotImplementedError:
-        pass  # expected
 
+    # test find_by_key
+    result_find = data.find_by_key(5).to.list()
+    assert_that(result_find == [5], "find_by_key should find the correct element in a descending list")
+
+    # test between_keys
+    # note: the user provides bounds in a "natural" high-to-low order for descending sorts
+    result_between = data.between_keys(7, 5).to.list()
+    assert_that(result_between == [7, 6, 5], "between_keys should return the correct range from a descending list")
+
+    # test that an empty result is returned for an invalid range
+    result_empty = data.between_keys(4, 8).to.list()
+    assert_that(result_empty == [], "between_keys on a descending sort should return empty for a low-to-high range")
 
 # --- advanced functional & tree operation tests ---
 
