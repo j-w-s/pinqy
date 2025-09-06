@@ -196,6 +196,14 @@ def test_left_join():
     user_b_result = from_iterable(results).to.single(lambda r: r['name'] == 'B')
     assert_that(user_b_result['post_id'] is None, "user with no posts should have a null post_id")
 
+# --- zip ---
+
+@test("zip_with correctly combines sequences using the .zip accessor")
+def test_zip_accessor():
+    a = from_iterable([1, 2, 3])
+    b = ['a', 'b', 'c']
+    result = a.zip.zip_with(b, lambda n, s: f"{n}-{s}")
+    assert_that(result.to.list() == ['1-a', '2-b', '3-c'], "zipped output is incorrect")
 
 # --- grouping and windowing tests ---
 
@@ -227,6 +235,29 @@ def test_window():
     expected = [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
     assert_that(windows.to.list() == expected, "should produce correct sliding windows")
 
+@test("pivot creates a correct pivot table")
+def test_pivot():
+    sales_data = from_iterable([
+        {'year': 2023, 'product': 'A', 'sales': 100},
+        {'year': 2023, 'product': 'B', 'sales': 150},
+        {'year': 2024, 'product': 'A', 'sales': 120},
+        {'year': 2023, 'product': 'A', 'sales': 50},
+        {'year': 2024, 'product': 'B', 'sales': 200},
+    ])
+
+    result = sales_data.group.pivot(
+        row_selector=lambda r: r['year'],
+        column_selector=lambda r: r['product'],
+        aggregator=lambda group: group.stats.sum(lambda s: s['sales'])
+    )
+
+    expected = {
+        2023: {'A': 150, 'B': 150},
+        2024: {'A': 120, 'B': 200}
+    }
+
+    assert_that(result == expected, "pivot table structure or values are incorrect")
+    assert_that(result[2023]['A'] == 150, "aggregated value for (2023, A) is wrong")
 
 # --- statistical operation tests ---
 
@@ -405,7 +436,6 @@ def test_stress_pinqy():
     if len(results) > 1:
         assert_that(from_iterable(results).select(lambda x: x['id']).set.distinct().to.count() == len(results),
                     "ids should be unique")
-
 
 # --- run the suite ---
 if __name__ == "__main__":

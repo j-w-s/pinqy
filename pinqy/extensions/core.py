@@ -1,10 +1,10 @@
 from __future__ import annotations
 import typing
-from itertools import chain, takewhile, dropwhile, batched
+from itertools import chain, takewhile, dropwhile
 from ..types import *
 
 if typing.TYPE_CHECKING:
-    from ..enumerable import OrderedEnumerable
+    from ..enumerable import Enumerable, OrderedEnumerable
 
 class _CoreOperations(Generic[T]):
     def where(self: 'Enumerable[T]', predicate: Predicate[T]) -> 'Enumerable[T]':
@@ -15,7 +15,6 @@ class _CoreOperations(Generic[T]):
             optimized = self._try_numpy_optimization(data, 'where', predicate)
             if optimized is not None: return optimized
             return [x for x in data if predicate(x)]
-        # always return a base enumerable
         return Enumerable(filter_data)
 
     def select(self: 'Enumerable[T]', selector: Selector[T, U]) -> 'Enumerable[U]':
@@ -32,7 +31,6 @@ class _CoreOperations(Generic[T]):
         """project and flatten sequences"""
         from ..enumerable import Enumerable
         def flat_map_data():
-            # a nested list comprehension is often more performant and is functionally equivalent
             return [item for sublist in self.select(selector) for item in sublist]
         return Enumerable(flat_map_data)
 
@@ -59,13 +57,11 @@ class _CoreOperations(Generic[T]):
     def take_while(self: 'Enumerable[T]', predicate: Predicate[T]) -> 'Enumerable[T]':
         """take elements while predicate is true"""
         from ..enumerable import Enumerable
-        # itertools.takewhile is the most efficient implementation for this
         return Enumerable(lambda: list(takewhile(predicate, self._get_data())))
 
     def skip_while(self: 'Enumerable[T]', predicate: Predicate[T]) -> 'Enumerable[T]':
         """skip elements while predicate is true"""
         from ..enumerable import Enumerable
-        # itertools.dropwhile is the most efficient implementation for this
         return Enumerable(lambda: list(dropwhile(predicate, self._get_data())))
 
     def select_with_index(self: 'Enumerable[T]', selector: Callable[[T, int], U]) -> 'Enumerable[U]':
@@ -84,7 +80,6 @@ class _CoreOperations(Generic[T]):
         """appends a value to the end of the sequence"""
         from ..enumerable import Enumerable
         def append_data():
-            # itertools.chain is the most memory-efficient way to combine iterables
             return list(chain(self._get_data(), [element]))
         return Enumerable(append_data)
 
@@ -92,7 +87,6 @@ class _CoreOperations(Generic[T]):
         """adds a value to the beginning of the sequence"""
         from ..enumerable import Enumerable
         def prepend_data():
-            # chain is also optimal for prepending
             return list(chain([element], self._get_data()))
         return Enumerable(prepend_data)
 
@@ -106,8 +100,6 @@ class _CoreOperations(Generic[T]):
 
     def of_type(self: 'Enumerable[T]', type_filter: Type[U]) -> 'Enumerable[U]':
         """filters the elements of a sequence based on a specified type"""
-        # this is syntactic sugar over where() but improves readability and intent
-        # the type hint Type[U] ensures the user passes a class/type, not an instance
         return self.where(lambda item: isinstance(item, type_filter))
 
     def as_ordered(self: 'Enumerable[T]') -> 'OrderedEnumerable[T]':
@@ -116,6 +108,4 @@ class _CoreOperations(Generic[T]):
         this does not perform a sort. use it only when the source is pre-sorted.
         """
         from ..enumerable import OrderedEnumerable
-        # create an orderedenumerable with a no-op sort
-        # the key is constant, so python's stable sort preserves the original order
         return OrderedEnumerable(self._data_func, [(lambda x: None, False)])

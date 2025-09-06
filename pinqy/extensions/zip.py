@@ -1,5 +1,6 @@
 from __future__ import annotations
 import typing
+from itertools import zip_longest
 from ..types import *
 
 if typing.TYPE_CHECKING:
@@ -20,13 +21,18 @@ class ZipAccessor(Generic[T]):
                          default_self: Optional[T] = None, default_other: Optional[U] = None) -> 'Enumerable[V]':
         """zip sequences padding shorter with defaults"""
         from ..enumerable import Enumerable
-        def manual_zip_longest():
-            self_data, other_data = self._enumerable._get_data(), list(other)
-            max_len = max(len(self_data), len(other_data))
+        def zip_longest_data():
+            # use a sentinel object to distinguish from a fill value of none
+            sentinel = object()
+            self_data = self._enumerable._get_data()
+            other_data = list(other)
+            zipped = zip_longest(self_data, other_data, fillvalue=sentinel)
+
             result = []
-            for i in range(max_len):
-                s_item = self_data[i] if i < len(self_data) else default_self
-                o_item = other_data[i] if i < len(other_data) else default_other
+            for t, u in zipped:
+                s_item = t if t is not sentinel else default_self
+                o_item = u if u is not sentinel else default_other
                 result.append(result_selector(s_item, o_item))
             return result
-        return Enumerable(manual_zip_longest)
+
+        return Enumerable(zip_longest_data)

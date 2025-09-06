@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import total_ordering
+import typing
 
 import numpy as np
 import pandas as pd
@@ -142,7 +143,6 @@ class OrderedEnumerable(Enumerable[T]):
         efficiently finds all items matching a key prefix using binary search (o(log n)).
         supports mixed ascending/descending sort keys.
         """
-
         def find_data():
             if not self._sort_keys:
                 raise TypeError("find_by_key requires at least one order_by call.")
@@ -163,9 +163,6 @@ class OrderedEnumerable(Enumerable[T]):
             end_index = bisect_right(sorted_data, wrapped_prefix, key=key_wrapper)
 
             return sorted_data[start_index:end_index]
-
-        return Enumerable(find_data)
-
         return Enumerable(find_data)
 
     def between_keys(self, lower_bound: Union[Any, Tuple], upper_bound: Union[Any, Tuple]) -> 'Enumerable[T]':
@@ -199,7 +196,6 @@ class OrderedEnumerable(Enumerable[T]):
             end_index = bisect_right(sorted_data, wrapped_upper, key=key_wrapper)
 
             return sorted_data[start_index:end_index]
-
         return Enumerable(between_data)
 
     def merge_with(self, other: 'OrderedEnumerable[T]') -> 'Enumerable[T]':
@@ -207,7 +203,6 @@ class OrderedEnumerable(Enumerable[T]):
         efficiently merges this sorted sequence with another compatible sorted sequence (o(n + m)).
         raises an error if the sort keys and directions are not identical.
         """
-
         def merge_data():
             if [sk[1] for sk in self._sort_keys] != [sk[1] for sk in other._sort_keys]:
                 raise TypeError("cannot merge enumerables with different sort keys or directions.")
@@ -215,7 +210,6 @@ class OrderedEnumerable(Enumerable[T]):
             list_a = self._get_data()
             list_b = other._get_data()
 
-            # build a single comparison function based on the shared sort definition
             key_selector = self._get_full_key_selector()
             desc_flags = [is_desc for _, is_desc in self._sort_keys]
 
@@ -227,7 +221,6 @@ class OrderedEnumerable(Enumerable[T]):
                     if k1 > k2: return -1 if is_desc else 1
                 return 0
 
-            # two-pointer merge algorithm using the comparator
             result = []
             i, j = 0, 0
             while i < len(list_a) and j < len(list_b):
@@ -241,7 +234,6 @@ class OrderedEnumerable(Enumerable[T]):
             result.extend(list_a[i:])
             result.extend(list_b[j:])
             return result
-
         return Enumerable(merge_data)
 
     def lag_in_order(self, periods: int = 1, fill_value: Optional[T] = None) -> 'Enumerable[Optional[T]]':
@@ -249,12 +241,10 @@ class OrderedEnumerable(Enumerable[T]):
         shifts elements by periods based on the sorted order.
         different from the standard lag(), which uses original sequence order.
         """
-
         def lag_sorted_data():
             sorted_data = self._get_data()
             if periods <= 0: return sorted_data
             return ([fill_value] * periods) + sorted_data[:-periods]
-
         return Enumerable(lag_sorted_data)
 
     def lead_in_order(self, periods: int = 1, fill_value: Optional[T] = None) -> 'Enumerable[Optional[T]]':
@@ -262,10 +252,8 @@ class OrderedEnumerable(Enumerable[T]):
         shifts elements forward by periods based on the sorted order.
         different from the standard lead(), which uses original sequence order.
         """
-
         def lead_sorted_data():
             sorted_data = self._get_data()
             if periods <= 0: return sorted_data
             return sorted_data[periods:] + ([fill_value] * periods)
-
         return Enumerable(lead_sorted_data)
