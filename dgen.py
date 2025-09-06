@@ -10,7 +10,7 @@
 import numpy as np
 from faker import Faker
 from pinqy import from_iterable, Enumerable
-from typing import Any, Dict, List, Optional, Union, Tuple, Callable
+from typing import Any, Dict, Optional
 
 
 class Generator:
