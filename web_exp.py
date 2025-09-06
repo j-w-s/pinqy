@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
 """
 functional web graph explorer tool
 pure functional approach to web scraping at scale
 everything is a tree in a graph of trees, discovered through structural analysis
-
-key insight: domains are navigable objects that can be recursively explored
+domains are navigable objects that can be recursively explored
 without presumptions about structure or data. tag-agnostic, dictionary-based,
-purely functional approach using pinqy for linq-like operations.
+purely functional approach using pinqy
 """
 
 import requests
@@ -50,6 +48,7 @@ class ExplorationConfig:
 
 
 # --- core functions ---
+
 def create_session(config: ExplorationConfig) -> requests.Session:
     session = requests.Session()
     session.headers.update({'User-Agent': config.user_agent, **(config.custom_headers or {})})

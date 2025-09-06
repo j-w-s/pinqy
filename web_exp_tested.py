@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
 """
 functional web graph explorer tool
 pure functional approach to web scraping at scale
 everything is a tree in a graph of trees, discovered through structural analysis
-
-key insight: domains are navigable objects that can be recursively explored
+domains are navigable objects that can be recursively explored
 without presumptions about structure or data. tag-agnostic, dictionary-based,
-purely functional approach using pinqy for linq-like operations.
+purely functional approach using pinqy
 """
 
 import requests
@@ -52,7 +50,6 @@ class ExplorationConfig:
 # --- core functions ---
 
 def create_session(config: ExplorationConfig) -> requests.Session:
-    # ... (no changes in this function)
     session = requests.Session()
     session.headers.update({'User-Agent': config.user_agent, **(config.custom_headers or {})})
     return session
@@ -67,7 +64,6 @@ def check_robots_txt(domain: str, session: requests.Session) -> Callable[[str], 
         return lambda url: True
 
 
-# enhancement: make fetcher content-aware
 def fetch_page_safe(url: str, session: requests.Session, robots_checker: Callable[[str], bool]) -> Optional[
     Tuple[str, BeautifulSoup]]:
     """atomic: safely fetch and parse a single page, returning its type."""
@@ -92,7 +88,6 @@ def fetch_page_safe(url: str, session: requests.Session, robots_checker: Callabl
         return None
 
 
-# enhancement: new dedicated sitemap parser
 def parse_sitemap(soup: BeautifulSoup) -> List[str]:
     """extracts all urls from a sitemap or sitemap index file."""
     # handles both <sitemap><loc>...</loc></sitemap> for index files
@@ -263,7 +258,6 @@ def discover_data_fields_functional(elements: List[Dict[str, Any]]) -> List[Dict
     }).order_by_descending(lambda f: f['occurrence_rate']).to.list())
 
 
-# enhancement: function now acts as a router for html vs xml
 def process_url_functionally(url: str, session: requests.Session, robots_checker: Callable[[str], bool],
                              base_domain: str) -> Optional[Dict[str, Any]]:
     """process a single url through the complete pipeline, routing by content type."""

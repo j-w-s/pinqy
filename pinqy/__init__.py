@@ -19,7 +19,6 @@ from .factories import (
     generate,
     pinqy,
     P,
-    # new factory functions
     create_tree_from_flat,
     recursive_generator
 )
