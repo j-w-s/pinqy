@@ -1,10 +1,15 @@
-### dgen.py README
+# dgen - declarative data generation
+
+```
+.------..------..------..------.
+|d.--. ||g.--. ||e.--. ||n.--. |
+| :/\: || :/\: || (\/) || :(): |
+| (__) || :\/: || :\/: || ()() |
+| '--'d|| '--'g|| '--'e|| '--'n|
+`------'`------'`------'`------'
+```
 
 a schema-based data generation library powered by faker and numpy for creating realistic, structured test data.
-
-## installation
-
-include the `dgen.py` file in your project. it has dependencies on `faker`, `numpy`, and `pinqy`.
 
 ## core concepts
 
@@ -47,58 +52,24 @@ print(users[0]['username'])
 # output: 'jennifer80'
 ```
 
+---
+
 ## api reference
 
 ### factory functions
 
-#### `from_schema(schema: any, seed: optional[int] = none)`
-creates a data generator from a python dictionary schema.
-
--   **`schema`**: a python dictionary defining the structure of the data to be generated.
--   **`seed`**: an optional integer to ensure the generated data is reproducible.
--   **returns**: a `_schemaprovider` instance with a `.take()` method.
-
-```python
-object_schema = {
-    'id': ('pyint', {'min_value': 1, 'max_value': 100}),
-    'name': 'word'
-}
-# create the generator
-generator = dgen.from_schema(object_schema, seed=42)
-```
-
-#### `from_json(json_input: union[str, path, textio], seed: optional[int] = none)`
-creates a data generator by inferring a schema from an example json object.
-
--   **`json_input`**: can be a json string, a `pathlib.path` object to a `.json` file, or a file-like object. if the json contains a list of objects, the first object is used as the template.
--   **`seed`**: an optional integer for reproducibility.
--   **returns**: a `_schemaprovider` instance.
-
-```python
-# from a json string
-json_string = '{"id": 1, "product_name": "widget", "active": true}'
-generator = dgen.from_json(json_string, seed=1)
-
-# from a file
-# assuming 'data/example.json' exists
-generator = dgen.from_json('data/example.json', seed=1)
-```
+| function | parameters | description | example |
+| :--- | :--- | :--- | :--- |
+| `from_schema()` | `schema: any`,<br/>`seed: int = none` | creates a generator from a python dictionary schema. | `schema = {'id': 'pyint', 'name': 'word'}`<br/>`gen = dgen.from_schema(schema, seed=42)` |
+| `from_json()` | `json_input: str|path`,<br/>`seed: int = none` | creates a generator by inferring a schema from an example json object, string, or file path. | `json_str = '{"id": 1, "active": true}'`<br/>`gen = dgen.from_json(json_str, seed=1)` |
 
 ### terminal operations
 
-#### `.take(count: int)`
-generates a specified number of objects based on the schema. this is called on the object returned by a factory function.
+| method | parameters | description | example |
+| :--- | :--- | :--- | :--- |
+| `.take()` | `count: int` | generates a specified number of objects. returns a `pinqy.enumerable` for further processing. | `data = gen.take(100)`<br/>`data_list = data.to.list()` |
 
--   **`count`**: the number of objects to generate.
--   **returns**: a `pinqy.enumerable` for further processing.
-
-```python
-# generate 100 objects
-data = dgen.from_schema(object_schema).take(100)
-
-# materialize the data into a list
-data_list = data.to.list()
-```
+---
 
 ## schema definition guide
 
@@ -109,7 +80,8 @@ the schema is a dictionary that maps keys to value generators.
 use faker provider names as strings. for providers that take arguments, use a tuple `(provider_name, kwargs_dict)`.
 
 ```python
-schema = {
+# schema
+{
     'name': 'name',                                 # simple provider
     'sentence': ('sentence', {'nb_words': 5}),      # provider with arguments
     'number': ('pyint', {'min_value': 0, 'max_value': 100})
@@ -121,10 +93,11 @@ schema = {
 to generate a list of items, use a list containing a single dictionary. this dictionary defines the schema for the list items and the number of items to generate via special keys.
 
 -   **`_qen_items`**: the schema for each individual item in the list.
--   **`_qen_count`**: the number of items to generate. can be an integer for a fixed count or a tuple `(min, max)` for a random count.
+-   **`_qen_count`**: the number of items to generate. can be an `int` for a fixed count or a tuple `(min, max)` for a random count within a range.
 
 ```python
-schema = {
+# schema
+{
     'tags': [{
         '_qen_items': 'word',      # each item in the list will be a random word
         '_qen_count': (3, 5)       # generate between 3 and 5 tags
@@ -134,57 +107,11 @@ schema = {
 
 ### dgen providers
 
-for custom logic, `dgen` provides its own special providers via the `_qen_provider` key.
+for custom logic, `dgen` provides its own special providers. these are defined in a dictionary with a `_qen_provider` key.
 
-#### `choice`
-randomly selects one value from a given list.
-
-```python
-schema = {
-    'priority': {
-        '_qen_provider': 'choice',
-        'from': ['low', 'medium', 'high']
-    }
-}
-```
-
-#### `ref`
-references a value that has already been generated in the *same object*. this is useful for creating dependent fields. an optional `format` string can be provided.
-
-```python
-schema = {
-    'first_name': 'first_name',
-    'full_name': {
-        '_qen_provider': 'ref',
-        'key': 'first_name',
-        'format': '{} baker' # optional format string
-    }
-}
-# possible result: {'first_name': 'john', 'full_name': 'john baker'}
-```
-
-#### `lambda`
-evaluates a python lambda function to compute a value. the `context` dictionary, containing already-generated fields for the current object, is available.
-
-```python
-schema = {
-    'price': ('pyint', {'min_value': 10, 'max_value': 100}),
-    'tax': ('pyfloat', {'min_value': 0.05, 'max_value': 0.20}),
-    'total_cost': {
-        '_qen_provider': 'lambda',
-        'func': "lambda context: context['price'] * (1 + context['tax'])"
-    }
-}
-```
-
-#### `literal`
-returns a fixed, literal value. useful for constants or for types that are not automatically handled (like `none`).
-
-```python
-schema = {
-    'version': {
-        '_qen_provider': 'literal',
-        'value': '1.0'
-    }
-}
-```
+| provider | keys | description | example |
+| :--- | :--- | :--- | :--- |
+| **`choice`** | `from: list` | randomly selects one value from the given `from` list. | `{'status': {'_qen_provider': 'choice', 'from': ['a', 'b', 'c']}}` |
+| **`ref`** | `key: str`,<br/>`format: str = none` | references a value already generated in the *same object*. useful for creating dependent fields. | `{'first': 'first_name', 'full': {'_qen_provider': 'ref', 'key': 'first'}}` |
+| **`lambda`** | `func: str` | evaluates a python lambda function string. gets a `context` dict of already-generated fields. | `{'total': {'_qen_provider': 'lambda', 'func': "lambda ctx: ctx['price'] * 1.07"}}` |
+| **`literal`** | `value: any` | returns a fixed, literal value. useful for constants or types like `none`. | `{'version': {'_qen_provider': 'literal', 'value': '1.0'}}` |
