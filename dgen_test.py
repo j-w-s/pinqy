@@ -1,8 +1,14 @@
+import os
 import time
 import suite
 from dgen import from_schema
 # import new factory and support classes
 from pinqy import from_iterable, from_range, repeat, empty, Enumerable, create_tree_from_flat, ParseResult
+import json
+import uuid
+from pathlib import Path
+import suite
+from dgen import from_json
 
 # --- setup ---
 test = suite.test
@@ -466,6 +472,116 @@ def test_try_parse():
     assert_that(result.successes == [1, 2, 3], "successes list is incorrect")
     assert_that(result.failures == ['a', 'b'], "failures list is incorrect")
 
+# --- from_json tests ---
+
+@test("from_json infers schema from a simple json string")
+def test_from_json_simple_string():
+    json_string = """
+    {
+        "id": 1,
+        "is_active": true,
+        "score": 95.5,
+        "tags": ["alpha", "beta"]
+    }
+    """
+    # create a generator from the json and take 10 items
+    generator = from_json(json_string, seed=42)
+    data = generator.take(10).to.list()
+
+    assert_that(len(data) == 10, "should generate the requested number of items")
+    first_item = data[0]
+    assert_that(isinstance(first_item['id'], int), "id should be inferred as an integer")
+    assert_that(isinstance(first_item['is_active'], bool), "is_active should be inferred as a boolean")
+    assert_that(isinstance(first_item['score'], float), "score should be inferred as a float")
+    assert_that(isinstance(first_item['tags'], list), "tags should be inferred as a list")
+    assert_that(len(first_item['tags']) == 2, "inferred list should preserve original length")
+
+
+@test("from_json correctly infers string heuristics")
+def test_from_json_string_heuristics():
+    json_string = """
+    {
+        "user_uuid": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        "email": "test.user@example.com",
+        "user_name": "John Doe",
+        "status": "pending",
+        "description": "this is a multi-word sentence."
+    }
+    """
+    # generate a single object to check its properties
+    generator = from_json(json_string, seed=101)
+    item = generator.take(1).to.first()
+
+    # check uuid
+    try:
+        uuid.UUID(item['user_uuid'])
+        is_valid_uuid = True
+    except ValueError:
+        is_valid_uuid = False
+    assert_that(is_valid_uuid, "user_uuid should be a valid uuid4 string")
+
+    # check other heuristics
+    assert_that('@' in item['email'], "email should contain an '@' symbol")
+    assert_that(' ' in item['user_name'], "user_name should be inferred as a multi-word name")
+    assert_that(' ' not in item['status'], "status should be inferred as a single word")
+    assert_that(len(item['description'].split()) > 1, "description should be inferred as a sentence")
+
+
+@test("from_json loads from a file path")
+def test_from_json_file():
+    # this test creates and deletes its own file to remain self-contained
+    file_name = "sample.json"
+    json_content = [
+        {"product_id": 100, "name": "widget", "in_stock": True},
+        {"product_id": 200, "name": "gadget", "in_stock": False}
+    ]
+
+    try:
+        # setup: create the json file
+        with open(file_name, "w") as f:
+            json.dump(json_content, f)
+
+        # test: create generator from the file path
+        generator = from_json(file_name, seed=1)
+        data = generator.take(5).to.list()
+
+        assert_that(len(data) == 5, "should generate 5 items")
+        first_item = data[0]
+        assert_that('product_id' in first_item and 'name' in first_item, "generated items should have the correct keys")
+        assert_that(isinstance(first_item['product_id'], int), "product_id should be an int")
+        assert_that(isinstance(first_item['in_stock'], bool), "in_stock should be a bool")
+
+    finally:
+        # teardown: clean up the file
+        if os.path.exists(file_name):
+            os.remove(file_name)
+
+
+@test("from_json handles nested objects and lists of objects")
+def test_from_json_nested():
+    json_string = """
+    {
+        "order_id": "xyz-123",
+        "customer": {
+            "id": 5,
+            "name": "alice"
+        },
+        "items": [
+            { "sku": "a-01", "quantity": 2 },
+            { "sku": "b-02", "quantity": 1 }
+        ]
+    }
+    """
+    generator = from_json(json_string, seed=99)
+    data = generator.take(3).to.list()
+
+    assert_that(len(data) == 3, "should generate 3 root objects")
+    first_item = data[0]
+    assert_that(isinstance(first_item['customer'], dict), "customer should be a nested dictionary")
+    assert_that(isinstance(first_item['customer']['id'], int), "nested customer id should be an int")
+    assert_that(isinstance(first_item['items'], list), "items should be a list")
+    assert_that(len(first_item['items']) == 2, "nested list should have the same length as the template")
+    assert_that(isinstance(first_item['items'][0]['quantity'], int), "quantity in list of objects should be an int")
 
 # --- stress test with combined operations ---
 
@@ -497,7 +613,6 @@ def test_stress_pinqy():
         assert_that(from_iterable(results).select(lambda x: x['id']).set.distinct().to.count() == len(results),
                     "ids should be unique")
 
-
 # --- run the suite ---
 if __name__ == "__main__":
-    suite.run(title="pinqy test suite")
+    suite.run(title="dgen test suite")
