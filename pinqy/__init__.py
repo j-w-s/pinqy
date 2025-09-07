@@ -19,6 +19,7 @@ from .factories import (
     generate,
     pinqy,
     P,
+    p,
     create_tree_from_flat,
     recursive_generator
 )

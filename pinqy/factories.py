@@ -65,3 +65,4 @@ def recursive_generator(seed: T,
 # --- aliases ---
 pinqy = from_iterable
 P = from_iterable
+p = from_iterable
