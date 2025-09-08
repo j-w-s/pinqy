@@ -37,6 +37,7 @@ A functional programming library that brings linq-style query operations to pyth
 *   **Lazy Evaluation**: operations build a pipeline but don't execute until a terminal method (e.g., `.to.list()`) is called. this optimizes performance by processing only the data that is actually needed.
 *   **Numpy Optimization**: for enumerables containing numeric data, many operations are automatically accelerated using numpy's vectorized functions.
 *   **Accessors**: functionality is organized into logical namespaces like `.set`, `.group`, `.stats`, etc., to keep the api clean and discoverable.
+*   **Developer Experience & Algorithmic Safety**: `pinqy` is designed to be a joy to use, providing a self-documenting, fluent API that works seamlessly with native python objects. while not intended to replace high-performance analytical libraries like pandas for multi-million record datasets, it provides a crucial "safety net." by using `pinqy`, you are guaranteed to be using an efficient underlying algorithm (e.g., an o(n) `distinct` operation), protecting you from accidentally writing a slow, naive implementation (like an o(n²) loop). this makes it an ideal tool for application development, scripting, and working with data where readability and correctness are paramount.
 
 **Installation**:
 ```bash
