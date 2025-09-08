@@ -91,10 +91,10 @@ pip install -r requirements.txt
 | `.then_by()` | `key_selector` | performs a subsequent ascending sort. | `users.order_by(lambda u: u.dept).then_by(lambda u: u.age)` |
 | `.then_by_descending()` | `key_selector` | performs a subsequent descending sort. | `users.order_by(u.city).then_by_descending(u.salary)` |
 | `.find_by_key()` | `*key_prefix` | efficiently finds items matching a key prefix using binary search. | `users.order_by(u.state).then_by(u.city)`<br/>`     .find_by_key("ca", "los angeles")` |
-| `.between_keys()` | `lower`, `upper` | gets a slice where sort keys are between bounds. | `products.order_by(p.price).between_keys(10.00, 49.99)` |
+| `.between_keys()` | `lower_bound`, `upper_bound` | gets a slice where sort keys are between bounds. | `products.order_by(p.price).between_keys(10.00, 49.99)` |
 | `.merge_with()` | `other` | merges two compatibly sorted sequences (o(n+m)). | `sorted1 = p(d1).order_by(x.id)`<br/>`sorted2 = p(d2).order_by(x.id)`<br/>`merged = sorted1.merge_with(sorted2)` |
-| `.lag_in_order()` | `periods`, `fill` | shifts elements back `periods` *based on sorted order*. | `prices.order_by(p.date).lag_in_order(1)` |
-| `.lead_in_order()` | `periods`, `fill` | shifts elements forward `periods` *based on sorted order*. | `prices.order_by(p.date).lead_in_order(1)` |
+| `.lag_in_order()` | `periods`, `fill_value` | shifts elements back `periods` *based on sorted order*. | `prices.order_by(p.date).lag_in_order(1)` |
+| `.lead_in_order()` | `periods`, `fill_value` | shifts elements forward `periods` *based on sorted order*. | `prices.order_by(p.date).lead_in_order(1)` |
 
 ---
 
@@ -107,7 +107,7 @@ pip install -r requirements.txt
 | `.distinct()` | `key_selector=none`| returns distinct elements. *numpy optimized*. | `p([1,2,1,3]).set.distinct().to.list() # [1, 2, 3]`<br/>`people.set.distinct(lambda p: p['city'])` |
 | `.union()` | `other: iterable` | set union (distinct, order-preserved). | `p([1,2]).set.union([2,3,4]).to.list() # [1, 2, 3, 4]` |
 | `.intersect()`| `other: iterable` | set intersection, preserving order from first. | `p([1,2,3]).set.intersect([2,4,3]).to.list() # [2, 3]` |
-| `.except_()` | `other: iterable` | set difference (items in first but not second). | `p([1,2,3]).set.except_([2,4]).to.list() # [1, 3]` |
+| `.except_()` | `other: iterable` | set difference (items in first but not second). | `p([1,2,3]).set.except_([2,4]).to.list() # [1, 2]` |
 | `.symmetric_difference()` | `other` | items in one or the other, but not both. | `p([1,2,3]).set.symmetric_difference([2,4,5]).to.list()`<br/>`# [1, 3, 4, 5]` |
 | `.concat()` | `other: iterable` | concatenates sequences, preserving duplicates. | `p([1,2]).set.concat([2,3]).to.list() # [1, 2, 2, 3]` |
 | `.multiset_intersect()`| `other` | multiset (bag) intersection, respecting counts. | `p([1,1,2,3]).set.multiset_intersect([1,2,2]).to.list() # [1, 2]` |
@@ -125,25 +125,25 @@ pip install -r requirements.txt
 | :--- | :--- | :--- | :--- |
 | `.group_by()` | `key_selector` | groups by key. **returns `dict`**. | `people.group.group_by(lambda p: p['department'])`<br/>`# {'eng': [p1, p2], 'sales': [p3]}` |
 | `.group_by_multiple()` | `*key_selectors`| groups by tuple key. **returns `dict`**. | `people.group.group_by_multiple(p.dept, p.level)`<br/>`# {('eng','sr'): [...], ...}` |
-| `.group_by_with_aggregate()`| `key, element, result` | groups and transforms. **returns `dict`**. | `people.group.group_by_with_aggregate(`<br/>`  lambda p: p['city'],`<br/>`  lambda p: p['salary'],`<br/>`  lambda city, sals: sum(sals) / len(sals))`<br/>`# {'ny': 95000, 'lon': 88000}` |
-| `.pivot()` | `row, col, aggregator` | creates a pivot table. **returns nested `dict`**. | `sales.group.pivot(`<br/>`  row_selector=lambda r: r['year'],`<br/>`  column_selector=lambda r: r['product'],`<br/>`  aggregator=lambda g: g.stats.sum(s['sales']))`<br/>`# {2023: {'a': 100, 'b': 150}, ...}` |
+| `.group_by_with_aggregate()`| `key, element, result` | groups by key and transforms each group. `result` selector receives `(key, enumerable_group)`. **returns `dict`**. | `people.group.group_by_with_aggregate(`<br/>`  lambda p: p['city'],`<br/>`  lambda p: p['salary'],`<br/>`  lambda city, sals: sals.stats.average())`<br/>`# {'ny': 95000, 'lon': 88000}` |
+| `.pivot()` | `row_selector`, `column_selector`, `aggregator` | creates a pivot table. **returns nested `dict`**. | `sales.group.pivot(`<br/>`  row_selector=lambda r: r['year'],`<br/>`  column_selector=lambda r: r['product'],`<br/>`  aggregator=lambda g: g.stats.sum(lambda s: s['sales']))`<br/>`# {2023: {'a': 150, 'b': 150}, ...}` |
 | `.partition()` | `predicate` | splits into two lists. **returns `(true_list, false_list)`**. | `evens, odds = nums.group.partition(lambda x: x % 2 == 0)` |
 | `.chunk()` | `size` | splits into chunks of specified size. | `p(range(10)).group.chunk(3).to.list()`<br/>`# [[0,1,2], [3,4,5], [6,7,8], [9]]` |
 | `.batched()` | `size` | (py 3.12+) batches into tuples. | `p(range(10)).group.batched(3).to.list()`<br/>`# [(0,1,2), (3,4,5), (6,7,8), (9,)]` |
 | `.window()` | `size` | creates a sliding window of elements. | `p(range(5)).group.window(3).to.list()`<br/>`# [[0,1,2], [1,2,3], [2,3,4]]` |
 | `.pairwise()` | - | returns consecutive overlapping pairs. | `p([1,2,3,4]).group.pairwise().to.list() # [(1,2), (2,3), (3,4)]` |
 | `.batch_by()` | `key_selector` | groups consecutive elements with same key. | `p([1,1,2,3,3,2]).group.batch_by(lambda x:x).to.list()`<br/>`# [[1,1], [2], [3,3], [2]]` |
-| `.group_by_nested()`| `key`, `sub_key`| creates a two-level nested dict. | `data.group.group_by_nested(x.state, x.city)`<br/>`# {'ca': {'la': [...], 'sf': [...]}}` |
+| `.group_by_nested()`| `key_selector`, `sub_key_selector`| creates a two-level nested dict. | `data.group.group_by_nested(x.state, x.city)`<br/>`# {'ca': {'la': [...], 'sf': [...]}}` |
 
 #### `.join`: Joining Sequences
 
 | method | parameters | description | example |
 | :--- | :--- | :--- | :--- |
-| `.join()` | `inner`, `outer_key`, `inner_key`, `result` | inner join on matching keys. | `people.join.join(orders, p['id'], o['cid'],`<br/>`  lambda p, o: {'name': p['name'], 'total': o['total']})` |
+| `.join()` | `inner`, `outer_key_selector`, `inner_key_selector`, `result_selector` | inner join on matching keys. | `people.join.join(orders, p['id'], o['cid'],`<br/>`  lambda p, o: {'name': p['name'], 'total': o['total']})` |
 | `.left_join()` | `inner`, ..., `default_inner` | left outer join. includes all outer elements. | `people.join.left_join(orders, p['id'], o['cid'],`<br/>`  lambda p, o: {'name': p.name, 'total': o.total if o else 0})` |
 | `.right_join()`| `inner`, ..., `default_outer` | right outer join. includes all inner elements. | `p(o).join.right_join(people, ...)` |
 | `.full_outer_join()`|`inner`, ..., `defaults` | full outer join. includes all elements from both. | `p(p).join.full_outer_join(orders, ...)` |
-| `.group_join()` | `inner`, ..., `result` | correlates and groups results. `result` gets a list of matching inners. | `people.join.group_join(orders, p['id'], o['cid'],`<br/>`  lambda p, ords: {'name': p.name, 'orders': len(ords)})` |
+| `.group_join()` | `inner`, ..., `result_selector` | correlates and groups results. `result` selector receives `(outer_item, enumerable_of_inners)`. | `people.join.group_join(orders, p['id'], o['cid'],`<br/>`  lambda p, ords: {'name': p.name, 'orders': ords.to.count()})` |
 | `.cross_join()`| `inner: iterable` | computes the cartesian product. | `p(['red','blue']).join.cross_join(['s','m'])` |
 
 #### `.zip`: Zipping Sequences
@@ -151,7 +151,7 @@ pip install -r requirements.txt
 | method | parameters | description | example |
 | :--- | :--- | :--- | :--- |
 | `.zip_with()` | `other`, `result_selector`| merges sequences with a function. stops at shorter. | `p([1,2]).zip.zip_with(['a','b'], lambda n, l: f"{n}{l}")`<br/>`# yields "1a", "2b"` |
-| `.zip_longest_with()`| `other`, `result`, `defaults` | merges sequences, padding shorter with defaults. | `p([1]).zip.zip_longest_with(['a','b'], ..., default_self=0)`<br/>`# yields "1a", "0b"` |
+| `.zip_longest_with()`| `other`, `result_selector`, `default_self`, `default_other` | merges sequences, padding shorter with defaults. | `p([1]).zip.zip_longest_with(['a','b'], ..., default_self=0)`<br/>`# yields "1a", "0b"` |
 
 #### `.comb`: Combinatorics
 
@@ -176,19 +176,19 @@ pip install -r requirements.txt
 | | `.median()` | `selector=none` | calculates median value. `p([1,2,100]).stats.median() # 2` |
 | | `.percentile()` | `q: float`, `selector=none`| calculates q-th percentile (0-100). `nums.stats.percentile(75)` |
 | | `.mode()` | `selector=none` | finds most frequent element. `p([1,2,2,3]).stats.mode() # 2` |
-| **rolling** | `.rolling_window()`| `size`, `aggregator`| applies custom aggregator to sliding windows. `nums.stats.rolling_window(3, lambda w: sum(w)/len(w))`|
-| | `.rolling_sum()` | `size`, `selector=none`| calculates a rolling sum. `p([1,2,3,4]).stats.rolling_sum(2)` |
-| | `.rolling_average()`| `size`, `selector=none`| calculates a rolling average. |
-| **time series** | `.lag()` | `periods=1`, `fill=none` | shifts elements back. `p([1,2,3,4]).stats.lag(2, 0).to.list() # [0,0,1,2]` |
-| | `.lead()` | `periods=1`, `fill=none` | shifts elements forward. `p([1,2,3,4]).stats.lead(2, 0).to.list() # [3,4,0,0]` |
+| **rolling** | `.rolling_window()`| `window_size`, `aggregator`| applies custom aggregator to sliding windows. `nums.stats.rolling_window(3, lambda w: sum(w)/len(w))`|
+| | `.rolling_sum()` | `window_size`, `selector=none`| calculates a rolling sum. `p([1,2,3,4]).stats.rolling_sum(2)` |
+| | `.rolling_average()`| `window_size`, `selector=none`| calculates a rolling average. |
+| **time series** | `.lag()` | `periods=1`, `fill_value=none` | shifts elements back. `p([1,2,3,4]).stats.lag(2, 0).to.list() # [0,0,1,2]` |
+| | `.lead()` | `periods=1`, `fill_value=none` | shifts elements forward. `p([1,2,3,4]).stats.lead(2, 0).to.list() # [3,4,0,0]` |
 | | `.diff()` | `periods=1` | diff between element and previous. `p([10,12,11,15]).stats.diff().to.list() # [2,-1,4]`|
-| **cumulative** | `.scan()` | `acc`, `seed` | produces intermediate accumulation values. `p([1,2,3]).stats.scan(op.add, 0).to.list() # [0,1,3,6]` |
+| **cumulative** | `.scan()` | `accumulator`, `seed` | produces intermediate accumulation values. `p([1,2,3]).stats.scan(op.add, 0).to.list() # [0,1,3,6]` |
 | | `.cumulative_sum()`| `selector=none` | calculates cumulative sum. `p([1,2,3,4]).stats.cumulative_sum().to.list() # [1,3,6,10]` |
 | | `.cumulative_product()`|`selector=none`| calculates cumulative product. |
 | | `.cumulative_max()` | `selector=none` | finds cumulative maximum. `p([1,5,2,6]).stats.cumulative_max()` |
 | | `.cumulative_min()` | `selector=none` | finds cumulative minimum. |
-| **ranking** | `.rank()` | `selector=none`, `asc=true`| 1-based rank; skips on ties (1, 2, 2, 4). `p([10,30,20,30]).stats.rank(asc=False).to.list() # [4,1,3,1]` |
-| | `.dense_rank()` | `selector=none`, `asc=true`| 1-based rank; no gaps on ties (1, 2, 2, 3). `p([10,30,20,30]).stats.dense_rank(asc=False).to.list() # [3,1,2,1]` |
+| **ranking** | `.rank()` | `selector=none`, `ascending=true`| 1-based rank; same rank for ties (1, 2, 2, 4). `p([10,30,20,30]).stats.rank(ascending=False).to.list() # [4,1,3,1]` |
+| | `.dense_rank()` | `selector=none`, `ascending=true`| 1-based rank; no gaps for ties (1, 2, 2, 3). `p([10,30,20,30]).stats.dense_rank(ascending=False).to.list() # [3,1,2,1]` |
 | | `.quantile_cut()` | `q`, `selector=none`| bins elements into `q` quantiles. |
 | **scaling** | `.normalize()` | `selector=none` | min-max normalization to [0, 1]. `p([0,5,10]).stats.normalize()`|
 | | `.standardize()` | `selector=none` | z-score standardization (mean=0, std=1). |
@@ -204,30 +204,37 @@ pip install -r requirements.txt
 | | `.unzip()` | - | transforms `enumerable[tuple]` to `tuple[enumerable]`. `p([('a',1),('b',2)]).util.unzip()` |
 | | `.intersperse()`| `separator` | places separator between elements. `p([1,2,3]).util.intersperse(0).to.list() # [1,0,2,0,3]` |
 | | `.run_length_encode()`| - | groups consecutive elements. `p("aabbc").util.run_length_encode().to.list() # [('a',2),('b',2),('c',1)]` |
-| **chaining** | `.for_each()` | `action` | performs action. *materializes*. `nums.util.for_each(print).where(...)` |
+| **chaining** | `.for_each()` | `action` | performs an action on each element. **eager**: executes immediately and returns the original enumerable. `nums.util.for_each(print).where(...)` |
 | | `.side_effect()`| `action` | performs action. *lazy*. `nums.where(...).util.side_effect(print).select(...)` |
 | | `.pipe()` | `func`, `*args`, `**kwargs` | pipes enumerable into a function. `data.util.pipe(my_plot_func, title="Plot")` |
-| | `.memoize()` | - | evaluates and caches the result. |
-| **sampling** | `.sample()` | `n`, `replace`, `state` | takes a random sample of `n` elements. `data.util.sample(10, random_state=42)` |
-| | `.stratified_sample()`|`key`, `n_per_group` | stratified sampling to ensure representation. |
-| | `.bootstrap_sample()`|`n_samples`, `size` | generates multiple bootstrap samples. |
+| | `.memoize()` | - | returns an enumerable that caches the results of the chain upon first access. **lazy**. |
+| **sampling** | `.sample()` | `n`, `replace`, `random_state` | takes a random sample of `n` elements. `data.util.sample(10, random_state=42)` |
+| | `.stratified_sample()`|`key_selector`, `samples_per_group` | stratified sampling to ensure representation. |
+| | `.bootstrap_sample()`|`n_samples`, `sample_size` | generates multiple bootstrap samples. |
 | **functional**| `.pipe_through()`|`*operations` | applies a series of (enumerable->enumerable) functions. `data.util.pipe_through(op1, op2)` |
-| | `.apply_if()` | `cond`, `op` | conditionally applies an operation. `data.util.apply_if(should_sort, lambda en: en.order_by(...))` |
-| | `.apply_when()`| `pred`, `op` | conditionally applies an op if `pred(enumerable)` is true. |
-| | `.lazy_where()`| `context_pred`| filter where predicate receives `(item, all_items_list)`. `nums.util.lazy_where(lambda i, all: i > sum(all)/len(all))` |
-| | `.topological_sort()`|`dep_selector` | performs a topological sort on a dag. |
-| | `.unfold()` | `seed_sel`, `unfolder` | generates new sequence by repeatedly applying `unfolder`. |
+| | `.apply_if()` | `condition`, `operation` | conditionally applies an operation. `data.util.apply_if(should_sort, lambda en: en.order_by(...))` |
+| | `.apply_when()`| `predicate`, `operation` | conditionally applies an op if `pred(enumerable)` is true. |
+| | `.lazy_where()`| `contextual_predicate`| filter where predicate receives `(item, all_items_list)`. `nums.util.lazy_where(lambda i, all: i > sum(all)/len(all))` |
+| | `.topological_sort()`|`dependency_selector` | performs a topological sort on a dag. |
+| | `.unfold()` | `seed_selector`, `unfolder` | generates new sequence by repeatedly applying `unfolder`. |
 | | `.try_parse()` | `parser` | parses strings, returning `parseresult`. |
-| | `.parse_or_default()`| `parser`, `default` | parses strings, using a default value for failures. |
+| | `.parse_or_default()`| `parser`, `default_value` | parses strings, using a default value for failures. |
+| | `.compose()` | `*functions` | applies functions from left to right. `data.util.compose(op1, op2)`|
+| | `.apply_functions()` | `functions` | applies multiple functions to each element. `p([1,2]).util.apply_functions([lambda x: x*2, lambda x: x+1])`|
+| | `.memoize_advanced()` | - | advanced lazy memoization with partial caching. |
 
 #### `.tree`: Tree & Hierarchical Data
 
 | method | parameters | description | example |
 | :--- | :--- | :--- | :--- |
-| `.recursive_select()` | `child_sel`, `include_parents` | depth-first traversal, flattening tree to sequence. | `nodes.tree.recursive_select(lambda n: n.get('children'))` |
-| `.build_tree()` | `key`, `parent_key`, `root_key`| builds a tree from a flat enumerable. | `flat_data.tree.build_tree(`<br/>`  key_selector=lambda i: i['id'],`<br/>`  parent_key_selector=lambda i: i['parent_id'])` |
-| `.traverse_with_path()`|`child_sel` | traverses tree, yielding `treenode` objects. | `nodes.tree.traverse_with_path(n.children)` |
-| `.select_recursive()`|`leaf, child, branch`| applies different logic to leaf vs. branch nodes. | `fs_tree.tree.select_recursive(`<br/>`  leaf_selector=lambda leaf: leaf['size'],`<br/>`  child_selector=lambda n: n.get('children'),`<br/>`  branch_selector=lambda br, child_res: sum(child_res))` |
+| `.recursive_select()` | `child_selector`, `include_parents` | depth-first traversal, flattening tree to sequence. | `nodes.tree.recursive_select(lambda n: n.get('children'))` |
+| `.recursive_where()` | `child_selector`, `predicate` | filters elements recursively through a tree structure. | `nodes.tree.recursive_where(n.children, lambda n: n.is_active)`|
+| `.recursive_select_many()`|`child_selector`, `result_selector`| recursively traverses and flattens the results. | `nodes.tree.recursive_select_many(n.children, n.tags)`|
+| `.build_tree()` | `key_selector`, `parent_key_selector`, `root_key`| builds a tree from a flat enumerable. | `flat_data.tree.build_tree(`<br/>`  key_selector=lambda i: i['id'],`<br/>`  parent_key_selector=lambda i: i['parent_id'])` |
+| `.traverse_with_path()`|`child_selector` | traverses tree, yielding `treenode` objects with context. | `nodes.tree.traverse_with_path(n.children)` |
+| `.select_recursive()`|`leaf_selector`, `child_selector`, `branch_selector`| applies different logic to leaf vs. branch nodes. | `fs_tree.tree.select_recursive(`<br/>`  leaf_selector=lambda leaf: leaf['size'],`<br/>`  child_selector=lambda n: n.get('children'),`<br/>`  branch_selector=lambda br, child_res: sum(child_res))` |
+| `.reduce_tree()`|`child_selector`, `seed`, `accumulator`| functional reduce over a tree with depth context. | `tree.tree.reduce_tree(n.children, 0, lambda acc, n, d: acc + n.val)`|
+| `.group_by_recursive()`|`key_selector`, `child_selector`| recursively groups elements while maintaining hierarchy. | `tree.tree.group_by_recursive(n.type, n.children)` |
 
 ---
 
@@ -247,7 +254,7 @@ pip install -r requirements.txt
 | `.any()` | `predicate=none` | checks if any element exists/matches. | `p([1,2]).to.any(lambda x: x > 1) # true` |
 | `.all()` | `predicate` | checks if all elements satisfy a predicate. | `p([1,2]).to.all(lambda x: x > 0) # true` |
 | `.first()` | `predicate=none` | gets first element. raises `valueerror`. | `p([1,2]).to.first(lambda x: x > 1) # 2` |
-| `.first_or_default()`| `pred=none`, `default=none` | gets first element or default. | `p([]).to.first_or_default(default=-1) # -1` |
+| `.first_or_default()`| `predicate=none`, `default=none` | gets first element or default. | `p([]).to.first_or_default(default=-1) # -1` |
 | `.single()` | `predicate=none` | gets single element. raises `valueerror`. | `p([5]).to.single() # 5` |
 | `.aggregate()` | `accumulator`, `seed=none` | reduce/fold operation. | `p([1,2,3,4]).to.aggregate(lambda acc, x: acc * x) # 24` |
-| `.aggregate_with_selector()` | `seed`, `acc`, `result` | aggregates with a final transformation. | `p(['a','b']).to.aggregate_with_selector(...)` |
+| `.aggregate_with_selector()` | `seed`, `accumulator`, `result_selector` | aggregates with a final transformation. | `p(['a','b']).to.aggregate_with_selector(...)` |

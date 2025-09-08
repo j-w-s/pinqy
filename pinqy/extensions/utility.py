@@ -15,16 +15,14 @@ class UtilityAccessor(Generic[T]):
     def for_each(self, action: Callable[[T], Any]) -> 'Enumerable[T]':
         """
         performs the specified action on each element of a sequence for side-effects.
-        this is a terminal operation in spirit but returns the original enumerable to allow chaining.
+        this is an EAGER operation that executes immediately.
+        returns the original enumerable to allow chaining.
         """
-        from ..enumerable import Enumerable
-        def for_each_data():
-            data = self._enumerable._get_data()
-            for item in data:
-                action(item)
-            # returns the original data to the next link in the chain
-            return data
-        return Enumerable(for_each_data)
+        # this is an eager operation.
+        for item in self._enumerable._get_data():
+            action(item)
+        # returns the original enumerable instance, not a new lazy one.
+        return self._enumerable
 
     def run_length_encode(self) -> 'Enumerable[Tuple[T, int]]':
         """
@@ -111,15 +109,16 @@ class UtilityAccessor(Generic[T]):
 
     def memoize(self) -> 'Enumerable[T]':
         """
-        evaluates the enumerable chain and caches the result. subsequent operations on the
-        returned enumerable will start from this cached state, preventing re-computation
-        of the preceding chain.
+        returns a new enumerable that caches the result of this one upon first evaluation.
+        this operation is LAZY. the cache is only populated when the new enumerable is
+        iterated for the first time.
         """
         from ..enumerable import Enumerable
-        # calling _get_data() triggers the full computation and caching
-        cached_data = self._enumerable._get_data()
-        # return a new enumerable that starts with the already-computed data
-        return Enumerable(lambda: cached_data)
+        # make the operation lazy.
+        # pass the original enumerable's _get_data method as the data_func for the new one.
+        # this means the original's data is only requested (and subsequently cached by itself)
+        # when the *new* enumerable is first evaluated.
+        return Enumerable(self._enumerable._get_data)
 
     def pipe(self, func: Callable[..., U], *args, **kwargs) -> U:
         """
@@ -142,7 +141,9 @@ class UtilityAccessor(Generic[T]):
                 action(item)
                 yield item
 
-        return Enumerable(lazy_side_effect_generator)
+        # Enumerable constructor expects a function that returns a list.
+        # generator must be wrapped in a lambda that materializes it.
+        return Enumerable(lambda: list(lazy_side_effect_generator()))
 
     def topological_sort(self, dependency_selector: Callable[[T], Iterable[T]]) -> 'Enumerable[T]':
         """

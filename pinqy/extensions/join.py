@@ -99,14 +99,16 @@ class JoinAccessor(Generic[T]):
 
     def group_join(self, inner: Iterable[U], outer_key_selector: KeySelector[T, K],
                    inner_key_selector: KeySelector[U, K],
-                   result_selector: Callable[[T, List[U]], V]) -> 'Enumerable[V]':
+                   result_selector: Callable[[T, 'Enumerable[U]'], V]) -> 'Enumerable[V]':
         """group join - groups inner elements by outer key"""
         from ..enumerable import Enumerable
+        from ..factories import from_iterable
         def group_join_data():
             inner_lookup = defaultdict(list)
             for inner_item in inner:
                 inner_lookup[inner_key_selector(inner_item)].append(inner_item)
-            return [result_selector(o, inner_lookup.get(outer_key_selector(o), [])) for o in self._enumerable._get_data()]
+            # pass an enumerable to the result selector, not a raw list
+            return [result_selector(o, from_iterable(inner_lookup.get(outer_key_selector(o), []))) for o in self._enumerable._get_data()]
         return Enumerable(group_join_data)
 
     def cross_join(self, inner: Iterable[U]) -> 'Enumerable[Tuple[T, U]]':

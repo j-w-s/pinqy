@@ -27,12 +27,14 @@ class GroupingAccessor(Generic[T]):
 
     def group_by_with_aggregate(self, key_selector: KeySelector[T, K],
                                 element_selector: Selector[T, U],
-                                result_selector: Callable[[K, List[U]], V]) -> Dict[K, V]:
+                                result_selector: Callable[[K, 'Enumerable[U]'], V]) -> Dict[K, V]:
         """group by key then transform each group"""
+        from ..factories import from_iterable
         groups = defaultdict(list)
         for item in self._enumerable._get_data():
             groups[key_selector(item)].append(element_selector(item))
-        return {key: result_selector(key, elements) for key, elements in groups.items()}
+        # pass an enumerable to the result selector, not a raw list
+        return {key: result_selector(key, from_iterable(elements)) for key, elements in groups.items()}
 
     def pivot(self,
               row_selector: KeySelector[T, K],

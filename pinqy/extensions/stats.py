@@ -126,7 +126,7 @@ class StatsAccessor(Generic[T]):
         """difference with previous elements"""
         lagged = self.lag(periods, fill_value=None)
         # zip automatically stops at the shorter iterable, correctly handling the length change
-        return self._enumerable.join.zip_with(lagged, lambda current, prev: current - prev if prev is not None and current is not None else None).skip(periods)
+        return self._enumerable.zip.zip_with(lagged, lambda current, prev: current - prev if prev is not None and current is not None else None).skip(periods)
 
     def scan(self, accumulator: Accumulator[U, T], seed: U) -> 'Enumerable[U]':
         """produce intermediate accumulation values, including seed"""
@@ -163,10 +163,18 @@ class StatsAccessor(Generic[T]):
         def rank_data():
             data = self._enumerable._get_data()
             values = [(selector(item) if selector else item) for item in data]
+            # use a stable sort on the original index to handle ties correctly
             indexed = sorted(enumerate(values), key=lambda p: p[1], reverse=not ascending)
             ranks = [0] * len(data)
-            for rank, (original_index, _) in enumerate(indexed):
-                ranks[original_index] = rank + 1
+            # assign rank, but if values are the same, assign the same rank
+            for i in range(len(indexed)):
+                original_index = indexed[i][0]
+                # tie handling: if the current value is the same as the previous, use the same rank
+                if i > 0 and indexed[i][1] == indexed[i-1][1]:
+                    original_prev_index = indexed[i-1][0]
+                    ranks[original_index] = ranks[original_prev_index]
+                else:
+                    ranks[original_index] = i + 1
             return ranks
         return Enumerable(rank_data)
 
@@ -175,7 +183,14 @@ class StatsAccessor(Generic[T]):
         from ..enumerable import Enumerable
         def dense_rank_data():
             values = self._enumerable.select(selector) if selector else self._enumerable
-            unique_sorted = values.set.distinct().order_by(lambda x: x, descending=not ascending).to.list()
+            distinct_values = values.set.distinct()
+
+            # use order_by or order_by_descending conditionally
+            if ascending:
+                unique_sorted = distinct_values.order_by(lambda x: x).to.list()
+            else:
+                unique_sorted = distinct_values.order_by_descending(lambda x: x).to.list()
+
             rank_map = {val: i + 1 for i, val in enumerate(unique_sorted)}
             return [rank_map[selector(item) if selector else item] for item in self._enumerable._get_data()]
         return Enumerable(dense_rank_data)

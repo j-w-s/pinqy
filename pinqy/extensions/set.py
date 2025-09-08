@@ -54,7 +54,10 @@ class SetAccessor(Generic[T]):
         from ..enumerable import Enumerable
         def except_data():
             other_set = set(other)
-            return [x for x in self._enumerable._get_data() if x not in other_set]
+            # ensure results are distinct and order-preserved, like a true set operation.
+            # dict.fromkeys efficiently gets unique elements from the source while preserving order.
+            unique_self = dict.fromkeys(self._enumerable._get_data())
+            return [x for x in unique_self if x not in other_set]
         return Enumerable(except_data)
 
     def symmetric_difference(self, other: Iterable[T]) -> 'Enumerable[T]':
