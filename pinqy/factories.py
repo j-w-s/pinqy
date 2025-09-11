@@ -1,8 +1,13 @@
-import typing
-from .types import *
 from collections import deque
+from typing import Iterable, List, Optional, Callable, Any
+from .types import *
 
-if typing.TYPE_CHECKING:
+try:
+    from typing import TYPE_CHECKING
+except ImportError:
+    TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from .enumerable import Enumerable
 
 def from_iterable(data: Iterable[T]) -> 'Enumerable[T]':
