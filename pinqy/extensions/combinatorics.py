@@ -1,4 +1,3 @@
-from __future__ import annotations
 import typing
 import math
 from itertools import (
@@ -20,17 +19,26 @@ class CombinatoricsAccessor(Generic[T]):
     def binomial_coefficient(self, r: int) -> int:
         """binomial coefficient n choose r, using python's optimized math.comb"""
         n = self._enumerable.to.count()
+        # math.comb raises valueerror for r < 0. return 0 for consistency.
+        if r < 0:
+            return 0
         return math.comb(n, r)
 
     def permutations(self, r: Optional[int] = None) -> 'Enumerable[Tuple[T, ...]]':
         """generate permutations using the efficient itertools implementation."""
         from ..factories import from_iterable
-        r = r or self._enumerable.to.count()
-        return from_iterable(itertools_permutations(self._enumerable.to.list(), r))
+        r_val = self._enumerable.to.count() if r is None else r
+        # itertools.permutations raises valueerror for r < 0. return empty enumerable.
+        if r_val < 0:
+            return from_iterable([])
+        return from_iterable(itertools_permutations(self._enumerable.to.list(), r_val))
 
     def combinations(self, r: int) -> 'Enumerable[Tuple[T, ...]]':
         """generate combinations using the efficient itertools implementation."""
         from ..factories import from_iterable
+        # itertools.combinations raises valueerror for r < 0. return empty enumerable.
+        if r < 0:
+            return from_iterable([])
         return from_iterable(itertools_combinations(self._enumerable.to.list(), r))
 
     def combinations_with_replacement(self, r: int) -> 'Enumerable[Tuple[T, ...]]':
@@ -39,6 +47,9 @@ class CombinatoricsAccessor(Generic[T]):
         elements are treated as if they were replaced after each pick.
         """
         from ..factories import from_iterable
+        # itertools.combinations_with_replacement raises valueerror for r < 0. return empty.
+        if r < 0:
+            return from_iterable([])
         return from_iterable(itertools_combinations_with_replacement(self._enumerable.to.list(), r))
 
     def power_set(self) -> 'Enumerable[Tuple[T, ...]]':

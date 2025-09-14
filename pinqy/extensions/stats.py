@@ -37,8 +37,11 @@ class StatsAccessor(Generic[T]):
     def sum(self, selector: Optional[Selector[T, Union[int, float]]] = None) -> Union[int, float]:
         """calc sum"""
         values = self._get_values(selector)
-        try: return np.sum(values)
-        except (TypeError, ValueError): return sum(values)
+        try:
+            result = np.sum(values)
+            return result.item() if hasattr(result, 'item') else result
+        except (TypeError, ValueError):
+            return sum(values)
 
     def average(self, selector: Optional[Selector[T, Union[int, float]]] = None) -> float:
         """calc average"""
@@ -231,3 +234,14 @@ class StatsAccessor(Generic[T]):
         lower_bound, upper_bound = q1 - factor * iqr, q3 + factor * iqr
         sel = selector if selector else lambda item: item
         return self._enumerable.where(lambda item: not (lower_bound <= sel(item) <= upper_bound))
+
+    def lag_in_order(self, periods: int = 1, fill_value: Optional[T] = None) -> 'Enumerable[Optional[T]]':
+        """
+        shifts elements by periods, but requires the enumerable to be ordered.
+        different from regular lag() which uses original sequence order.
+        """
+        from ..enumerable import OrderedEnumerable
+        if not isinstance(self._enumerable, OrderedEnumerable):
+            raise TypeError("lag_in_order can only be called on OrderedEnumerable instances. Use order_by() first.")
+
+        return self._enumerable.lag_in_order(periods, fill_value)

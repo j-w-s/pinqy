@@ -14,6 +14,7 @@ KeySelector = Callable[[T], K]
 Comparer = Callable[[T, T], int]
 Accumulator = Callable[[U, T], U]
 
+
 class TreeNode(Generic[T]):
     """represents a node in tree traversal with path and depth context"""
 
@@ -82,20 +83,79 @@ class MemoizedEnumerable(Generic[T]):
     """
 
     def __init__(self, data_func: Callable[[], Iterator[T]]):
-        self._source_iterator = iter(data_func())
+        self._source_func = data_func
         self._cache = []
+        self._source_iterator = None
         self._is_fully_enumerated = False
+
+    def _get_iterator(self):
+        """get or create the source iterator"""
+        if self._source_iterator is None:
+            self._source_iterator = iter(self._source_func())
+        return self._source_iterator
+
+    def _materialize_to_index(self, target_index: int):
+        """materialize the cache up to (and including) the target index"""
+        if self._is_fully_enumerated:
+            return
+
+        iterator = self._get_iterator()
+        while len(self._cache) <= target_index and not self._is_fully_enumerated:
+            try:
+                item = next(iterator)
+                self._cache.append(item)
+            except StopIteration:
+                self._is_fully_enumerated = True
+                break
+
+    def _materialize_all(self):
+        """fully materialize the enumerable into cache"""
+        if self._is_fully_enumerated:
+            return
+
+        iterator = self._get_iterator()
+        try:
+            while True:
+                item = next(iterator)
+                self._cache.append(item)
+        except StopIteration:
+            self._is_fully_enumerated = True
 
     def __iter__(self) -> Iterator[T]:
         # yield from cache first
         for item in self._cache:
             yield item
-        # if not fully enumerated, continue from source
+
         if not self._is_fully_enumerated:
+            iterator = self._get_iterator()
             try:
                 while True:
-                    item = next(self._source_iterator)
+                    item = next(iterator)
                     self._cache.append(item)
                     yield item
             except StopIteration:
                 self._is_fully_enumerated = True
+
+    def __getitem__(self, index):
+        """support indexing by materializing up to the requested index"""
+        if isinstance(index, slice):
+            start, stop, step = index.indices(len(self))
+            return [self[i] for i in range(start, stop, step)]
+
+        if index < 0:
+            self._materialize_all()
+            if abs(index) > len(self._cache):
+                raise IndexError("index out of range")
+            return self._cache[index]
+
+        self._materialize_to_index(index)
+
+        if index < len(self._cache):
+            return self._cache[index]
+        else:
+            raise IndexError("index out of range")
+
+    def __len__(self):
+        """get the length by fully materializing if necessary"""
+        self._materialize_all()
+        return len(self._cache)

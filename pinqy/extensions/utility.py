@@ -8,6 +8,7 @@ from ..types import *
 if typing.TYPE_CHECKING:
     from ..enumerable import Enumerable
 
+
 class UtilityAccessor(Generic[T]):
     def __init__(self, enumerable_instance: 'Enumerable[T]'):
         self._enumerable = enumerable_instance
@@ -39,17 +40,37 @@ class UtilityAccessor(Generic[T]):
 
     def flatten(self, depth: int = 1) -> 'Enumerable[Any]':
         """flatten nested sequences to a specified depth"""
-        if depth <= 0: return self._enumerable
-        current = self._enumerable
-        for _ in range(depth):
-            current = current.select_many(
-                lambda x: x if isinstance(x, Iterable) and not isinstance(x, (str, bytes)) else [x])
-        return current
+        from ..enumerable import Enumerable
+
+        def flatten_data():
+            def flatten_recursive(items, current_depth):
+                if current_depth <= 0:
+                    return items
+
+                result = []
+                for item in items:
+                    if isinstance(item, (list, tuple)) and not isinstance(item, (str, bytes)):
+                        result.extend(flatten_recursive(item, current_depth - 1))
+                    elif hasattr(item, '__iter__') and not isinstance(item, (str, bytes, dict)):
+                        result.extend(flatten_recursive(list(item), current_depth - 1))
+                    else:
+                        result.append(item)
+                return result
+
+            return flatten_recursive(self._enumerable._get_data(), depth)
+
+        return Enumerable(flatten_data)
 
     def transpose(self) -> 'Enumerable[List[Any]]':
         """transpose a matrix-like structure (list of lists) using the efficient itertools implementation."""
         from ..enumerable import Enumerable
-        return Enumerable(lambda: [list(col) for col in zip_longest(*self._enumerable._get_data())])
+        def transpose_data():
+            data = self._enumerable._get_data()
+            if not data:
+                return []
+            return [list(col) for col in zip_longest(*data)]
+
+        return Enumerable(transpose_data)
 
     def unzip(self) -> Tuple['Enumerable[Any]', ...]:
         """
@@ -66,13 +87,20 @@ class UtilityAccessor(Generic[T]):
 
     def intersperse(self, separator: T) -> 'Enumerable[T]':
         """intersperse separator between elements"""
-        from ..factories import from_iterable, repeat
-        data = self._enumerable.to.list()
-        if len(data) < 2: return from_iterable(data)
-        it = iter(data)
-        # a small correction: repeat is a factory, not a method
-        interspersed = chain.from_iterable(zip(it, repeat(separator, len(data) - 1)._get_data()))
-        return from_iterable(interspersed).set.concat(list(it))
+        from ..enumerable import Enumerable
+
+        def intersperse_data():
+            data = self._enumerable._get_data()
+            if len(data) < 2:
+                return data
+
+            result = [data[0]]
+            for item in data[1:]:
+                result.append(separator)
+                result.append(item)
+            return result
+
+        return Enumerable(intersperse_data)
 
     def sample(self, n: int, replace: bool = False,
                random_state: Optional[int] = None) -> 'Enumerable[T]':
@@ -95,7 +123,8 @@ class UtilityAccessor(Generic[T]):
             groups = self._enumerable.group.group_by(key_selector)
             result = []
             for group_items in groups.values():
-                result.extend(from_iterable(group_items).util.sample(min(samples_per_group, len(group_items))).to.list())
+                result.extend(
+                    from_iterable(group_items).util.sample(min(samples_per_group, len(group_items))).to.list())
             return result
 
         return Enumerable(stratified_data)
@@ -141,7 +170,7 @@ class UtilityAccessor(Generic[T]):
                 action(item)
                 yield item
 
-        # Enumerable constructor expects a function that returns a list.
+        # enumerable constructor expects a function that returns a list.
         # generator must be wrapped in a lambda that materializes it.
         return Enumerable(lambda: list(lazy_side_effect_generator()))
 
@@ -154,38 +183,44 @@ class UtilityAccessor(Generic[T]):
         from ..enumerable import Enumerable
         def sort_data():
             data = self._enumerable.to.list()
-            data_set = set(data)
 
-            # kahn's algorithm for topological sorting
-            in_degree = {u: 0 for u in data}
-            # adjacency list: u -> v means u must come before v
-            adj = {u: [] for u in data}
+            # create a mapping from items to indices for hashable lookups
+            item_to_index = {id(item): i for i, item in enumerate(data)}
+            index_to_item = {i: item for i, item in enumerate(data)}
 
-            for u in data:
-                for v in dependency_selector(u):
-                    if v not in data_set:
-                        # ignoring dependencies outside the current enumerable set
-                        continue
-                    adj[v].append(u)
-                    in_degree[u] += 1
+            in_degree = {i: 0 for i in range(len(data))}
+            adj = {i: [] for i in range(len(data))}
 
-            # queue for nodes with no incoming edges
-            queue = deque([u for u in data if in_degree[u] == 0])
-            sorted_list = []
+            for i, item in enumerate(data):
+                for dep in dependency_selector(item):
+                    dep_index = None
+                    for j, candidate in enumerate(data):
+                        if (isinstance(dep, dict) and isinstance(candidate, dict) and
+                            dep.get('id') == candidate.get('id')) or dep == candidate:
+                            dep_index = j
+                            break
+
+                    if dep_index is not None:
+                        adj[dep_index].append(i)
+                        in_degree[i] += 1
+
+            # kahn's algorithm
+            queue = deque([i for i in range(len(data)) if in_degree[i] == 0])
+            sorted_indices = []
 
             while queue:
                 u = queue.popleft()
-                sorted_list.append(u)
+                sorted_indices.append(u)
 
                 for v in adj[u]:
                     in_degree[v] -= 1
                     if in_degree[v] == 0:
                         queue.append(v)
 
-            if len(sorted_list) != len(data):
+            if len(sorted_indices) != len(data):
                 raise ValueError("a cycle was detected in the dependency graph.")
 
-            return sorted_list
+            return [index_to_item[i] for i in sorted_indices]
 
         return Enumerable(sort_data)
 
@@ -197,7 +232,7 @@ class UtilityAccessor(Generic[T]):
         from ..enumerable import Enumerable
         def is_iterable_default(item):
             return (isinstance(item, Iterable) and
-                    not isinstance(item, (str, bytes, bytearray)))
+                    not isinstance(item, (str, bytes, bytearray, dict)))
 
         is_iter_check = is_iterable_func or is_iterable_default
 
